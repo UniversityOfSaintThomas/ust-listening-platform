@@ -67,6 +67,7 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           TURNSTILE_SECRET: ${{ secrets.TURNSTILE_SECRET }}
           REVIEWERS: ${{ secrets.REVIEWERS }}
+          DASHBOARD_PASSWORD: ${{ secrets.DASHBOARD_PASSWORD }}
         run: |
           # The session signing secret is generated once and never leaves Cloudflare.
           if ! npx wrangler secret list | grep -q '"SESSION_SECRET"'; then
@@ -76,7 +77,7 @@ jobs:
           fi
           node -e '
             const out = {};
-            for (const name of ["OPENAI_API_KEY", "TURNSTILE_SECRET", "REVIEWERS", "SESSION_SECRET"]) {
+            for (const name of ["OPENAI_API_KEY", "TURNSTILE_SECRET", "REVIEWERS", "DASHBOARD_PASSWORD", "SESSION_SECRET"]) {
               if (process.env[name]) out[name] = process.env[name];
             }
             require("fs").writeFileSync("secrets.json", JSON.stringify(out));
