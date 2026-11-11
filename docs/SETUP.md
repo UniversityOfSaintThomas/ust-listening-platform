@@ -23,6 +23,7 @@ Secrets tab:
 |---|---|
 | `CLOUDFLARE_API_TOKEN` | The token from step 2 |
 | `OPENAI_API_KEY` | The key from step 1 |
+| `DASHBOARD_PASSWORD` | The shared password for the Leadership review page. Use at least 14 characters |
 | `REVIEWERS` | Later, in step 5. For example `{"stelar":["you@stthomas.edu"]}` |
 | `TURNSTILE_SECRET` | Later, in step 6 |
 
@@ -41,20 +42,17 @@ Every push to `main` deploys. To deploy without a code change: Actions, Deploy, 
 
 The workflow creates the database on first run, applies migrations, deploys the site, and copies the secrets above into Cloudflare. It also generates the session signing secret once. The site address appears in the Deploy step's log (`https://ust-listening-platform.<account>.workers.dev`).
 
-## 5. Reviewer sign-in (Cloudflare Access)
+## 5. Reviewer sign-in
 
-The dashboard at `/review` returns "sign in" to everyone until this is done.
+**Shared password (default).** Set the `DASHBOARD_PASSWORD` GitHub secret (step 3) and redeploy. Reviewers open `/review` and enter it. Sign-in lasts 12 hours. Five wrong attempts from one network lock sign-in for 15 minutes. Changing the secret signs everyone out. The password opens every campaign, so share it only with people who should read individual transcripts.
+
+**Named sign-in (optional, stronger).** Cloudflare Access can replace the password with per-person sign-in and per-campaign access:
 
 1. In Cloudflare Zero Trust, choose a team name. Your team domain is `<team>.cloudflareaccess.com`.
-2. Access, Applications, Add an application, Self-hosted.
-   - Add two paths on your site's hostname: `review` and `api/review`.
-   - Policy: Allow, Include, Emails: list each reviewer's address.
-   - Login method: One-time PIN works immediately. To use St. Thomas Microsoft sign-in, ITS must add Microsoft Entra ID as an identity provider in Zero Trust, which needs an app registration in the St. Thomas tenant.
-3. Copy the application's **Audience (AUD) tag**.
-4. In `wrangler.jsonc` set `ACCESS_TEAM_DOMAIN` to `<team>.cloudflareaccess.com` and `ACCESS_AUD` to the AUD tag. Commit.
-5. Set the `REVIEWERS` GitHub secret (step 3). Update it whenever the reviewer list changes. Use `"*"` as the key for people who can see every campaign.
-
-Reviewers are checked twice: Access decides who can sign in, and `REVIEWERS` decides which campaigns each person can open.
+2. Access, Applications, Add an application, Self-hosted. Add two paths on your site's hostname: `review` and `api/review`. Policy: Allow, Include, Emails: each reviewer's address.
+3. In `wrangler.jsonc` set `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD` (the application's Audience tag). Commit.
+4. Set the `REVIEWERS` GitHub secret, for example `{"stelar":["you@stthomas.edu"]}`. Use `"*"` as the key for people who can see every campaign.
+5. Remove the `DASHBOARD_PASSWORD` secret and delete it in Cloudflare (Workers, the app, Settings, Variables and Secrets).
 
 ## 6. Bot check (Turnstile)
 
