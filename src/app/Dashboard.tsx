@@ -201,6 +201,10 @@ export default function Dashboard() {
               <article><span>Ease of use, 1 to 5</span><b>{averageEase}</b></article>
             </div>
 
+            {submissions.length > 0 && submissions.length < 5 && (
+              <p className="notice">Fewer than five responses so far. Patterns are preliminary, and a person could be recognized from what they describe. Hold off on sharing details until more responses arrive.</p>
+            )}
+
             {attention.length > 0 && (
               <section className="panel attention" aria-label="Responses that need follow-up">
                 <h2>Needs a person to follow up ({attention.length})</h2>
@@ -230,14 +234,14 @@ export default function Dashboard() {
 
             <section className="responses">
               <h2>Individual responses</h2>
-              <p className="quiet small">Transcripts are deleted automatically after {data.campaign.retentionDays} days.</p>
+              <p className="quiet small">Responses are anonymous. Names and contact details were replaced with placeholders such as [name] before saving. Transcripts are deleted automatically after {data.campaign.retentionDays} days.</p>
               <div className="submission-list">
                 {submissions.length === 0 && <p className="quiet">Submitted feedback will appear here.</p>}
                 {submissions.map((s) => (
                   <article key={s.id}>
                     <button className={open === s.id ? "submission selected" : "submission"} aria-expanded={open === s.id} onClick={() => setOpen(open === s.id ? null : s.id)}>
-                      <span>{new Date(s.createdAt * 1000).toLocaleDateString()}</span>
-                      <b>{s.name || "Anonymous"}</b>
+                      <span>{new Date(s.createdAt * 1000).toLocaleDateString(undefined, { timeZone: "UTC" })}</span>
+                      <b>Anonymous response</b>
                       <small>{s.mode === "voice" ? "Voice" : "Typed"}{s.role ? ` · ${s.role}` : ""}{s.analysis ? ` · ${s.analysis.sentiment}` : ""}</small>
                       <small>{s.analysis?.summary || (s.analysisStatus === "pending" ? "Analysis in progress." : "Analysis did not complete.")}</small>
                     </button>
@@ -256,6 +260,16 @@ export default function Dashboard() {
                   </article>
                 ))}
               </div>
+            </section>
+
+            <section className="methods">
+              <h2>How these results are produced</h2>
+              <ul>
+                <li>An AI guide conducts each conversation. Participants review and edit their transcript before choosing to submit.</li>
+                <li>An AI step removes identifying details before a transcript is saved. It can miss things. If you see a name or identifying detail, delete the response.</li>
+                <li>AI codes each transcript into themes and drafts the synthesis. These are drafts. Check a claim against the transcripts before acting on it or sharing it.</li>
+                <li>No names, email addresses, IP addresses, or audio are stored. Dates are kept to the day.</li>
+              </ul>
             </section>
           </>
         )}

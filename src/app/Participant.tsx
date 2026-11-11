@@ -58,8 +58,7 @@ export default function Participant({ slug }: { slug: string }) {
   const [stage, setStage] = useState<Stage>("loading");
   const [error, setError] = useState("");
   const [mode, setMode] = useState<Mode>("voice");
-  const [identified, setIdentified] = useState(false);
-  const [name, setName] = useState("");
+  const [consented, setConsented] = useState(false);
   const [context, setContext] = useState<string[]>([]);
   const [turnstileToken, setTurnstileToken] = useState("");
   const [starting, setStarting] = useState(false);
@@ -154,7 +153,7 @@ export default function Participant({ slug }: { slug: string }) {
     setStarting(true);
     setError("");
     try {
-      const session = await post<{ clientSecret: string; submitToken: string }>("/api/sessions", { slug: campaign.slug, mode, context, turnstileToken });
+      const session = await post<{ clientSecret: string; submitToken: string }>("/api/sessions", { slug: campaign.slug, mode, context, turnstileToken, consent: consented });
       submitToken.current = session.submitToken;
       const guide = new GuideConnection({ onStatus: setStatus, onTurns: setTurns, onFinish: goToReview, onError: setError });
       connection.current = guide;
@@ -194,7 +193,7 @@ export default function Participant({ slug }: { slug: string }) {
     setSubmitting(true);
     setError("");
     try {
-      await post("/api/submissions", { slug: campaign.slug, submitToken: submitToken.current, transcript: cleaned, context, role, name: identified ? name : "", ease, mode });
+      await post("/api/submissions", { slug: campaign.slug, submitToken: submitToken.current, transcript: cleaned, context, role, ease, mode });
       setTurns([]);
       setStage("thanks");
     } catch (caught) {
@@ -215,7 +214,7 @@ export default function Participant({ slug }: { slug: string }) {
   const active = status === "hearing" || status === "speaking";
 
   const path: { label: string; state: "done" | "active" | "" }[] = [
-    { label: "Privacy choice", state: "done" },
+    { label: "Notice and consent", state: "done" },
     { label: "Experience context", state: stage === "context" ? "active" : "done" },
     { label: "Conversation", state: stage === "conversation" ? "active" : stage === "review" ? "done" : "" },
     { label: "Review", state: stage === "review" ? "active" : "" },
@@ -247,8 +246,8 @@ export default function Participant({ slug }: { slug: string }) {
           <div>
             <p className="section-label">A SHORT CONVERSATION</p>
             <h2 ref={heading} tabIndex={-1}>Your perspective matters here.</h2>
-            <p>{campaign.notice[0]}</p>
-            <ul className="notice-list quiet">{campaign.notice.slice(1).map((line) => <li key={line}>{line}</li>)}</ul>
+            <p>{campaign.purpose}</p>
+            <ul className="notice-list quiet">{campaign.notice.map((line) => <li key={line}>{line}</li>)}</ul>
             <p className="quiet"><strong>Who sees your response.</strong> {campaign.whoSeesResponses}</p>
           </div>
           <div className="intro-actions">
@@ -261,13 +260,12 @@ export default function Participant({ slug }: { slug: string }) {
                 <strong>Type</strong><span>Same questions, by text. No microphone or sound.</span>
               </button>
             </div>
-            <p id="identity-label">Would you like to identify yourself?</p>
-            <div className="identity-choice" role="radiogroup" aria-labelledby="identity-label">
-              <button type="button" role="radio" aria-checked={!identified} className={!identified ? "choice selected" : "choice"} onClick={() => setIdentified(false)}>Remain anonymous</button>
-              <button type="button" role="radio" aria-checked={identified} className={identified ? "choice selected" : "choice"} onClick={() => setIdentified(true)}>Identify myself</button>
-            </div>
-            {identified && <input className="name-input" aria-label="Your name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Your name" autoComplete="off" />}
-            <button className="primary" onClick={() => setStage("context")}>Begin {mode === "voice" ? "Live Chat" : "typing"}</button>
+            <label className="consent">
+              <input type="checkbox" checked={consented} onChange={(event) => setConsented(event.target.checked)} />
+              <span>{campaign.consentLabel}</span>
+            </label>
+            <button className="primary" disabled={!consented} aria-describedby={consented ? undefined : "consent-hint"} onClick={() => setStage("context")}>Begin {mode === "voice" ? "Live Chat" : "typing"}</button>
+            {!consented && <p id="consent-hint" className="quiet small consent-hint">Tick the box above to begin.</p>}
           </div>
         </section>
       )}
@@ -340,7 +338,7 @@ export default function Participant({ slug }: { slug: string }) {
             <div className="question-shell review-shell">
               <div className="question-kicker"><span>04</span><p>REVIEW</p></div>
               <h2 ref={heading} tabIndex={-1}>Thank you for your perspective.</h2>
-              <p>Your transcript is shown below. Edit or remove anything you said. Nothing has been saved yet.</p>
+              <p>Your transcript is shown below. Edit or remove anything you said, including any detail that could identify you. Nothing has been saved yet.</p>
 
               <div className="transcript editable">
                 {turns.length === 0 && <p className="quiet">No responses were captured.</p>}
@@ -371,7 +369,7 @@ export default function Participant({ slug }: { slug: string }) {
                 <option value="">Not stated</option>
                 {campaign.roles.map((option) => <option key={option}>{option}</option>)}
               </select>
-              <p className="quiet small">{identified && name.trim() ? `Submitting as ${name.trim()}.` : "Submitting anonymously."}</p>
+              <p className="quiet small">Your response is anonymous. Names, contact details, and similar identifying details are replaced with placeholders before it is saved.</p>
 
               <div className="response-actions">
                 <button className="quiet-button" onClick={() => { setTurns([]); setError(""); setDiscarded(true); setStage("thanks"); }}>Discard without submitting</button>
