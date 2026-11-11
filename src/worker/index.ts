@@ -79,9 +79,10 @@ async function startSession(request: Request, env: Env): Promise<Response> {
       },
     }),
   }).catch(() => null);
-  const secret = upstream ? ((await upstream.json().catch(() => null)) as { value?: string; expires_at?: number } | null) : null;
+  const secret = upstream ? ((await upstream.json().catch(() => null)) as { value?: string; expires_at?: number; error?: { message?: string; type?: string; code?: string; param?: string } } | null) : null;
   if (!upstream?.ok || !secret?.value) {
-    console.error("Client secret request failed", upstream?.status ?? "network error");
+    // The provider's error describes the request, never the key. Logged for the site owner only.
+    console.error("Client secret request failed", JSON.stringify({ status: upstream?.status ?? "network error", model: env.REALTIME_MODEL, error: secret?.error ?? null }));
     return json({ error: "The listening guide is unavailable right now. Please try again shortly." }, 502);
   }
 
