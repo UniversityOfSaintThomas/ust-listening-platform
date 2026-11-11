@@ -1,0 +1,83 @@
+import type { Campaign } from "../src/shared/types";
+
+export const stelar: Campaign = {
+  slug: "stelar",
+  status: "open",
+  unit: "STELAR",
+  unitSpoken: "stellar",
+  unitFullName: "Strategic Transformation in Education, Learning, And Research",
+  headline: "Tell us how STELAR can serve you better.",
+  invitation:
+    "A short conversation, by voice or by typing, about what is working and what should change. It takes about five to eight minutes.",
+  notice: [
+    "This is for improving STELAR services. It is not an evaluation of any individual.",
+    "There is no sign-in. Your name is stored only if you choose to give it at the end.",
+    "You will talk with an AI guide. Your audio is processed by OpenAI to run the conversation and is not kept by this site. Only the written transcript is saved, and only after you review it and choose to submit.",
+    "If you want to stay anonymous, avoid details that would identify you. Please describe services and processes instead of naming colleagues.",
+    "This is not a channel for urgent problems or formal complaints. Those should go to the IT help desk, your supervisor, or Human Resources.",
+  ],
+  whoSeesResponses:
+    "STELAR leadership reviews themes and summaries across all responses. A small number of named reviewers can read individual transcripts. Transcripts are deleted after 12 months.",
+  contextPrompt: "Which STELAR services have you used in the past year?",
+  contextOptions: [
+    "Training or workshops",
+    "Course or program design",
+    "Canvas or other learning tools",
+    "AI support or consultation",
+    "Accessibility support",
+    "Badges or microcredentials",
+    "Media production",
+    "Research or emerging technology",
+    "Something else",
+    "None yet",
+  ],
+  roles: ["Faculty", "Staff", "Student", "Other", "Prefer not to say"],
+  questions: [
+    {
+      id: "working",
+      ask: "What is STELAR doing well for you?",
+      listenFor:
+        "A specific service or interaction, what happened, and what it made possible for their teaching, work, or students.",
+    },
+    {
+      id: "friction",
+      ask: "Where have you run into friction, delays, or needs that were not met?",
+      listenFor:
+        "A concrete situation, what they were trying to do, where it got stuck, and what it cost them in time or outcome.",
+    },
+    {
+      id: "priority",
+      ask: "If STELAR could change one thing in the next year that would help you most, what would it be?",
+      listenFor: "One change, and why it matters more than the alternatives.",
+    },
+  ],
+  themes: [
+    "Training and workshops",
+    "Course and program design",
+    "Canvas and learning tools",
+    "AI support",
+    "Accessibility",
+    "Badges and microcredentials",
+    "Media production",
+    "Research and emerging technology",
+    "Communication and awareness",
+    "Responsiveness and turnaround",
+    "Access to people and expertise",
+    "Other",
+  ],
+  vocabulary: [
+    "STELAR",
+    "St. Thomas",
+    "Tommie",
+    "Canvas",
+    "instructional design",
+    "microcredentials",
+    "Aquinas AI",
+    "ITS",
+    "Zoom",
+    "Panopto",
+  ],
+  maxMinutes: 12,
+  retentionDays: 365,
+  dailySessionCap: 300,
+};
