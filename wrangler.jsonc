@@ -29,7 +29,7 @@
     "ANALYSIS_MODEL": "gpt-4.1-mini",
     "GUIDE_VOICE": "cedar",
     // Public Turnstile site key. Leave empty to disable the check (local development only).
-    "TURNSTILE_SITE_KEY": "",
+    "TURNSTILE_SITE_KEY": "0x4AAAAAAF9Briv_57uLE9iW",
     // Cloudflare Access, for the reviewer dashboard. Example: "yourteam.cloudflareaccess.com"
     "ACCESS_TEAM_DOMAIN": "",
     "ACCESS_AUD": ""
