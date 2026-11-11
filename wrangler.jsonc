@@ -18,6 +18,8 @@
       "migrations_dir": "migrations"
     }
   ],
+  // Keeps error logs in the Cloudflare dashboard. Logs never include transcripts or keys.
+  "observability": { "enabled": true },
   // Daily cleanup: retention purge and rate-limit log purge (08:17 UTC).
   "triggers": { "crons": ["17 8 * * *"] },
   "vars": {
