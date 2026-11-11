@@ -1,44 +1,45 @@
 # Setup guide
 
-About 45 minutes, once. You need a Cloudflare account, an OpenAI API account, and admin rights on this repository.
+About 30 minutes, once. You need a Cloudflare account, an OpenAI API account, and admin rights on this repository. No command line is required.
 
 ## 1. OpenAI
 
-1. At platform.openai.com, create a project named `ust-listening` and add billing.
-2. Create an API key restricted to that project. Keep it for step 3.
-3. Set a monthly spending limit on the project. Suggested starting limit: $50.
-4. Open the models page and confirm the three model names in `wrangler.jsonc` (`REALTIME_MODEL`, `TRANSCRIBE_MODEL`, `ANALYSIS_MODEL`) are current. Update them if newer versions are listed.
+1. At platform.openai.com, add billing and set a monthly budget. Suggested starting budget: $50.
+2. Create an API key named `ust-listening`. Keep it for step 3.
+3. Confirm the three model names in `wrangler.jsonc` (`REALTIME_MODEL`, `TRANSCRIBE_MODEL`, `ANALYSIS_MODEL`) are current.
 
 ## 2. Cloudflare
 
-1. Create the database:
-   ```bash
-   npx wrangler login
-   npx wrangler d1 create listening
-   ```
-   Copy the `database_id` it prints into `wrangler.jsonc`.
-2. Turnstile: in the dashboard, add a Turnstile widget for your domain (managed mode). Put the **site key** in `TURNSTILE_SITE_KEY` in `wrangler.jsonc`. Keep the **secret key** for step 3.
+1. Create an account. The free plan is enough.
+2. My Profile, API Tokens, Create Token, "Edit Cloudflare Workers" template. Add the permission **Account, D1, Edit**. Create the token and keep it for step 3.
 
-## 3. Secrets
+## 3. GitHub settings
 
-```bash
-npx wrangler secret put OPENAI_API_KEY
-npx wrangler secret put TURNSTILE_SECRET
-npx wrangler secret put SESSION_SECRET     # any long random string, for example: openssl rand -base64 48
-npx wrangler secret put REVIEWERS          # for example: {"stelar":["you@stthomas.edu"]}
-```
+In this repository: Settings, Secrets and variables, Actions.
 
-This repository is public. Never commit keys, reviewer email addresses, or participant data. All of those live in Cloudflare.
+Secrets tab:
 
-## 4. First deploy
+| Name | Value |
+|---|---|
+| `CLOUDFLARE_API_TOKEN` | The token from step 2 |
+| `OPENAI_API_KEY` | The key from step 1 |
+| `REVIEWERS` | Later, in step 5. For example `{"stelar":["you@stthomas.edu"]}` |
+| `TURNSTILE_SECRET` | Later, in step 6 |
 
-```bash
-npm install
-npm run db:migrate
-npm run deploy
-```
+Variables tab:
 
-Wrangler prints the site address (`https://ust-listening-platform.<account>.workers.dev`). A custom domain can be attached later under Workers, Settings, Domains and Routes.
+| Name | Value |
+|---|---|
+| `CLOUDFLARE_ACCOUNT_ID` | The ID in your Cloudflare dashboard address |
+| `DEPLOY_ENABLED` | `true` |
+
+This repository is public. Never commit keys, reviewer email addresses, or participant data.
+
+## 4. Deploy
+
+Every push to `main` deploys. To deploy without a code change: Actions, Deploy, Run workflow.
+
+The workflow creates the database on first run, applies migrations, deploys the site, and copies the secrets above into Cloudflare. It also generates the session signing secret once. The site address appears in the Deploy step's log (`https://ust-listening-platform.<account>.workers.dev`).
 
 ## 5. Reviewer sign-in (Cloudflare Access)
 
@@ -50,20 +51,18 @@ The dashboard at `/review` returns "sign in" to everyone until this is done.
    - Policy: Allow, Include, Emails: list each reviewer's address.
    - Login method: One-time PIN works immediately. To use St. Thomas Microsoft sign-in, ITS must add Microsoft Entra ID as an identity provider in Zero Trust, which needs an app registration in the St. Thomas tenant.
 3. Copy the application's **Audience (AUD) tag**.
-4. In `wrangler.jsonc` set:
-   - `ACCESS_TEAM_DOMAIN` to `<team>.cloudflareaccess.com`
-   - `ACCESS_AUD` to the AUD tag
-5. Update the `REVIEWERS` secret (step 3) whenever the reviewer list changes. Use `"*"` as the key for people who can see every campaign.
-6. Commit and push, or run `npm run deploy`.
+4. In `wrangler.jsonc` set `ACCESS_TEAM_DOMAIN` to `<team>.cloudflareaccess.com` and `ACCESS_AUD` to the AUD tag. Commit.
+5. Set the `REVIEWERS` GitHub secret (step 3). Update it whenever the reviewer list changes. Use `"*"` as the key for people who can see every campaign.
 
 Reviewers are checked twice: Access decides who can sign in, and `REVIEWERS` decides which campaigns each person can open.
 
-## 6. Automatic deploys from GitHub
+## 6. Bot check (Turnstile)
 
-1. Cloudflare dashboard, My Profile, API Tokens, Create Token, "Edit Cloudflare Workers" template. Add **D1: Edit** to its permissions.
-2. In this repository: Settings, Secrets and variables, Actions. Add `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
-3. On the same page, open the Variables tab and add a repository variable `DEPLOY_ENABLED` with the value `true`. Until this is set, pushes are checked but not deployed.
-4. Settings, Environments: create `production`. Optional: require your approval before each deploy.
+1. Cloudflare dashboard, Turnstile, Add widget. Hostname: your site address. Mode: Managed.
+2. Put the **site key** in `TURNSTILE_SITE_KEY` in `wrangler.jsonc` and commit.
+3. Add the **secret key** as the `TURNSTILE_SECRET` GitHub secret.
+
+Until this is done the bot check is off. Rate limits still apply.
 
 ## 7. Before inviting anyone
 
