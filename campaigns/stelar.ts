@@ -8,15 +8,17 @@ export const stelar: Campaign = {
   unitFullName: "Strategic Transformation in Education, Learning, And Research",
   headline: "What could feel more possible?",
   invitation: "Share a perspective. Help STELAR make the next learning experience more human, more useful, and more connected. It takes about five to eight minutes.",
+  purpose: "This conversation is designed to improve the services and supports that STELAR provides. It is not an evaluation of any individual.",
+  consentLabel: "I understand that I will be talking with an AI guide, and that AI tools will be used to analyze responses and report findings.",
   notice: [
-    "This is for improving STELAR services. It is not an evaluation of any individual.",
-    "There is no sign-in. Your response is anonymous unless you choose to identify yourself.",
-    "You will talk with an AI guide. Your audio is processed by OpenAI to run the conversation and is not kept by this site. Only the written transcript is saved, and only after you review it and choose to submit.",
-    "If you want to stay anonymous, avoid details that would identify you. Please describe services and processes instead of naming colleagues.",
+    "Taking part is voluntary. You can skip any question, stop at any time, or discard everything at the end. Nothing is saved until you review the transcript and choose to submit.",
+    "Your response is collected anonymously. There is no sign-in, and we do not ask for or store your name, email, or IP address.",
+    "You will talk with an AI guide, not a person. Your audio is processed by OpenAI to run the conversation and is not stored by this site. OpenAI does not use it to train its models and may keep safety logs for up to 30 days.",
+    "Before a transcript is saved, an automated step replaces names, contact details, and similar identifying details with placeholders such as [name]. It can miss things, so please describe services and processes instead of naming people, and leave out details that would identify you.",
+    "AI tools analyze the saved transcripts and draft the summaries that STELAR leadership reads. People review those summaries before acting on them.",
     "This is not a channel for urgent problems or formal complaints. Those should go to the IT help desk, your supervisor, or Human Resources.",
   ],
-  whoSeesResponses:
-    "STELAR leadership reviews themes and summaries across all responses and can read individual transcripts. Transcripts are deleted after 12 months.",
+  whoSeesResponses: "STELAR leadership reads the themes, summaries, and de-identified transcripts. Transcripts are deleted after 12 months.",
   contextPrompt: "Which STELAR services have you used in the past year?",
   contextOptions: [
     "Training or workshops",
