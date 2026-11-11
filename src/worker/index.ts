@@ -122,7 +122,7 @@ async function submit(request: Request, env: Env, ctx: ExecutionContext): Promis
   // nothing is saved and the participant can press Submit again.
   if (!env.OPENAI_API_KEY) return json({ error: "Responses cannot be saved right now. Please try again shortly." }, 503);
   let redacted: Turn[] | null = null;
-  for (let attempt = 0; attempt < 2 && !redacted; attempt += 1) {
+  for (let attempt = 0; attempt < 1 && !redacted; attempt += 1) {
     redacted = await redactTranscript(env, campaign, transcript).catch((error: unknown) => {
       console.error("Redaction failed", error instanceof Error ? error.message : "unknown");
       return null;
