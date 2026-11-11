@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Mode, PublicCampaign, Turn } from "../shared/types";
 import { GuideConnection, type GuideStatus } from "./realtime";
 
-type Stage = "loading" | "welcome" | "setup" | "conversation" | "review" | "thanks" | "unavailable";
+type Stage = "loading" | "intro" | "context" | "conversation" | "review" | "thanks" | "unavailable";
 
 declare global {
   interface Window {
@@ -12,13 +12,25 @@ declare global {
 
 const statusLabel: Record<GuideStatus, string> = {
   connecting: "Connecting to the guide",
-  listening: "Listening. Take your time.",
+  listening: "Listening live",
   hearing: "Hearing you",
   thinking: "One moment",
   speaking: "The guide is speaking",
   ended: "Conversation finished",
   error: "Connection problem",
 };
+
+const statusHeading: Record<GuideStatus, string> = {
+  connecting: "Connecting…",
+  listening: "Speak naturally. Take your time.",
+  hearing: "I'm listening.",
+  thinking: "One moment…",
+  speaking: "The guide is speaking.",
+  ended: "Thank you.",
+  error: "The connection dropped.",
+};
+
+const ratingLabels = ["Very difficult", "Difficult", "Okay", "Easy", "Excellent"];
 
 async function post<T>(url: string, body: unknown): Promise<T> {
   const response = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
@@ -27,11 +39,27 @@ async function post<T>(url: string, body: unknown): Promise<T> {
   return payload;
 }
 
+/** Bolds the first letter of each capitalized word, so the unit's acronym reads from its full name. */
+function Acronym({ name }: { name: string }) {
+  return (
+    <>
+      {name.split(" ").map((word, index) => (
+        <span key={index}>
+          {index > 0 && " "}
+          {/^[A-Z]/.test(word) ? <><strong>{word[0]}</strong>{word.slice(1)}</> : word}
+        </span>
+      ))}
+    </>
+  );
+}
+
 export default function Participant({ slug }: { slug: string }) {
   const [campaign, setCampaign] = useState<PublicCampaign | null>(null);
   const [stage, setStage] = useState<Stage>("loading");
   const [error, setError] = useState("");
   const [mode, setMode] = useState<Mode>("voice");
+  const [identified, setIdentified] = useState(false);
+  const [name, setName] = useState("");
   const [context, setContext] = useState<string[]>([]);
   const [turnstileToken, setTurnstileToken] = useState("");
   const [starting, setStarting] = useState(false);
@@ -43,7 +71,6 @@ export default function Participant({ slug }: { slug: string }) {
   const [draft, setDraft] = useState("");
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [role, setRole] = useState("");
-  const [name, setName] = useState("");
   const [ease, setEase] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [discarded, setDiscarded] = useState(false);
@@ -52,6 +79,7 @@ export default function Participant({ slug }: { slug: string }) {
   const turnstileBox = useRef<HTMLDivElement | null>(null);
   const captions = useRef<HTMLDivElement | null>(null);
   const heading = useRef<HTMLHeadingElement | null>(null);
+  const firstRender = useRef(true);
 
   useEffect(() => {
     fetch(`/api/campaigns/${encodeURIComponent(slug)}`)
@@ -60,20 +88,27 @@ export default function Participant({ slug }: { slug: string }) {
         const data = (await response.json()) as PublicCampaign;
         setCampaign(data);
         document.title = `${data.unit} feedback | University of St. Thomas`;
-        setStage(data.status === "open" ? "welcome" : "unavailable");
+        setStage(data.status === "open" ? "intro" : "unavailable");
       })
       .catch(() => setStage("unavailable"));
     return () => connection.current?.stop();
   }, [slug]);
 
-  // Move keyboard and screen reader focus to the new heading on every step.
+  // Move keyboard and screen reader focus to the new heading on every step after the first.
   useEffect(() => {
-    heading.current?.focus();
-    window.scrollTo({ top: 0 });
+    if (stage === "loading") return;
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    // The banner stays on every step, so bring the new step into view below it.
+    heading.current?.focus({ preventScroll: true });
+    const section = heading.current?.closest("section");
+    if (section) window.scrollTo({ top: section.getBoundingClientRect().top + window.scrollY - 24 });
   }, [stage]);
 
   useEffect(() => {
-    if (stage !== "setup" || !campaign?.turnstileSiteKey || !turnstileBox.current) return;
+    if (stage !== "context" || !campaign?.turnstileSiteKey || !turnstileBox.current) return;
     const box = turnstileBox.current;
     const render = () => window.turnstile?.render(box, { sitekey: campaign.turnstileSiteKey, callback: setTurnstileToken, "expired-callback": () => setTurnstileToken("") });
     if (window.turnstile) {
@@ -101,9 +136,9 @@ export default function Participant({ slug }: { slug: string }) {
     captions.current?.scrollTo({ top: captions.current.scrollHeight });
   }, [turns]);
 
-  if (stage === "loading") return <main className="shell"><p className="quiet" role="status">Loading…</p></main>;
+  if (stage === "loading") return <main><p className="quiet page-note" role="status">Loading…</p></main>;
   if (stage === "unavailable" || !campaign) {
-    return <main className="shell"><section className="card"><h1>This feedback page is not available.</h1><p>It may be closed, or the link may be incorrect.</p></section></main>;
+    return <main><section className="intro-panel thanks"><div><h1>This feedback page is not available.</h1><p>It may be closed, or the link may be incorrect.</p></div></section></main>;
   }
 
   function goToReview() {
@@ -125,6 +160,7 @@ export default function Participant({ slug }: { slug: string }) {
       connection.current = guide;
       guide.audio.muted = mode === "text";
       setVoiceMuted(mode === "text");
+      setMicMuted(false);
       setTurns([]);
       setSecondsLeft(campaign.maxMinutes * 60);
       setStage("conversation");
@@ -134,7 +170,7 @@ export default function Participant({ slug }: { slug: string }) {
     } catch (caught) {
       connection.current?.stop();
       connection.current = null;
-      setStage("setup");
+      setStage("context");
       setError(caught instanceof Error ? caught.message : "The conversation could not start.");
     } finally {
       setStarting(false);
@@ -158,7 +194,7 @@ export default function Participant({ slug }: { slug: string }) {
     setSubmitting(true);
     setError("");
     try {
-      await post("/api/submissions", { slug: campaign.slug, submitToken: submitToken.current, transcript: cleaned, context, role, name, ease, mode });
+      await post("/api/submissions", { slug: campaign.slug, submitToken: submitToken.current, transcript: cleaned, context, role, name: identified ? name : "", ease, mode });
       setTurns([]);
       setStage("thanks");
     } catch (caught) {
@@ -173,147 +209,194 @@ export default function Participant({ slug }: { slug: string }) {
   const removeTurn = (index: number) => setTurns((current) => current.filter((_, i) => i !== index));
   const needsCheck = Boolean(campaign.turnstileSiteKey) && !turnstileToken;
   const minutesLeft = Math.ceil(secondsLeft / 60);
+  const unitUpper = campaign.unit.toUpperCase();
+  const lastGuide = [...turns].reverse().find((turn) => turn.role === "guide")?.text || "";
+  const typing = mode === "text" || !hasMic;
+  const active = status === "hearing" || status === "speaking";
+
+  const path: { label: string; state: "done" | "active" | "" }[] = [
+    { label: "Privacy choice", state: "done" },
+    { label: "Experience context", state: stage === "context" ? "active" : "done" },
+    { label: "Conversation", state: stage === "conversation" ? "active" : stage === "review" ? "done" : "" },
+    { label: "Review", state: stage === "review" ? "active" : "" },
+  ];
 
   return (
-    <main className="shell">
+    <main>
       <header className="masthead">
-        <span className="wordmark">University of St. Thomas <b>{campaign.unit}</b></span>
+        <div className="wordmark">ST. THOMAS <span>{unitUpper}</span></div>
+        <span className="masthead-detail">INTERNAL LISTENING PROJECT</span>
       </header>
+
+      {
+        <section className="hero">
+          <div className="hero-copy">
+            <p className="eyebrow"><Acronym name={campaign.unitFullName} /></p>
+            <h1>{campaign.headline}</h1>
+            <p>{campaign.invitation}</p>
+            <div className="hero-line" />
+          </div>
+          <div className="hero-mark" aria-hidden="true"><span>LISTEN</span><b>→</b></div>
+        </section>
+      }
 
       {error && <p className="notice" role="alert">{error}</p>}
 
-      {stage === "welcome" && (
-        <section className="card">
-          <p className="label">{campaign.unitFullName}</p>
-          <h1 ref={heading} tabIndex={-1}>{campaign.headline}</h1>
-          <p className="lead">{campaign.invitation}</p>
-          <h2>Before you start</h2>
-          <ul className="plain-list">{campaign.notice.map((line) => <li key={line}>{line}</li>)}</ul>
-          <h2>Who sees your response</h2>
-          <p>{campaign.whoSeesResponses}</p>
-          <button className="primary" onClick={() => setStage("setup")}>I understand, continue</button>
-        </section>
-      )}
-
-      {stage === "setup" && (
-        <section className="card">
-          <h1 ref={heading} tabIndex={-1}>Two quick choices</h1>
-          <fieldset>
-            <legend>{campaign.contextPrompt} <span className="quiet">Choose any that apply.</span></legend>
-            <div className="chips">
-              {campaign.contextOptions.map((option) => (
-                <button key={option} type="button" className="chip" aria-pressed={context.includes(option)} onClick={() => toggle(option)}>{option}</button>
-              ))}
-            </div>
-          </fieldset>
-          <fieldset>
-            <legend>How would you like to respond?</legend>
-            <div className="options">
-              <label className="option"><input type="radio" name="mode" checked={mode === "voice"} onChange={() => setMode("voice")} /><span><b>Talk</b> Speak with the guide. Your browser will ask to use the microphone. You can also type at any point.</span></label>
-              <label className="option"><input type="radio" name="mode" checked={mode === "text"} onChange={() => setMode("text")} /><span><b>Type</b> Same questions, by text. No microphone or sound.</span></label>
-            </div>
-          </fieldset>
-          <div ref={turnstileBox} />
-          <button className="primary" disabled={starting || needsCheck} onClick={() => void begin()}>{starting ? "Starting…" : "Start the conversation"}</button>
-        </section>
-      )}
-
-      {stage === "conversation" && (
-        <section className="card conversation">
-          <h1 ref={heading} tabIndex={-1} className="visually-hidden">Conversation with the {campaign.unit} listening guide</h1>
-          <div className={`status status-${status}`}>
-            <span className="orb" aria-hidden="true" />
-            <p role="status">{statusLabel[status]}</p>
-            {minutesLeft <= 2 && status !== "connecting" && <p className="quiet">About {minutesLeft} {minutesLeft === 1 ? "minute" : "minutes"} left</p>}
+      {stage === "intro" && (
+        <section className="intro-panel">
+          <div>
+            <p className="section-label">A SHORT CONVERSATION</p>
+            <h2 ref={heading} tabIndex={-1}>Your perspective matters here.</h2>
+            <p>{campaign.notice[0]}</p>
+            <ul className="notice-list quiet">{campaign.notice.slice(1).map((line) => <li key={line}>{line}</li>)}</ul>
+            <p className="quiet"><strong>Who sees your response.</strong> {campaign.whoSeesResponses}</p>
           </div>
-
-          <div className="captions" ref={captions} role="log" aria-label="Conversation transcript" tabIndex={0}>
-            {turns.length === 0 && <p className="quiet">The conversation will appear here as text.</p>}
-            {turns.map((turn, index) => (
-              <p key={index} className={turn.role}><b>{turn.role === "guide" ? "Guide" : "You"}</b>{turn.text}</p>
-            ))}
-          </div>
-
-          <form className="type-row" onSubmit={(event) => { event.preventDefault(); sendDraft(); }}>
-            <label htmlFor="draft" className="visually-hidden">Type a response</label>
-            <input id="draft" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={hasMic ? "Or type here" : "Type your response"} autoComplete="off" />
-            <button className="secondary" type="submit" disabled={!draft.trim()}>Send</button>
-          </form>
-
-          <div className="controls">
-            {hasMic && (
-              <button className="secondary" aria-pressed={micMuted} onClick={() => { connection.current?.setMicrophoneMuted(!micMuted); setMicMuted(!micMuted); }}>
-                {micMuted ? "Unmute microphone" : "Mute microphone"}
+          <div className="intro-actions">
+            <p id="mode-label">How would you like to respond?</p>
+            <div className="mode-tabs" role="radiogroup" aria-labelledby="mode-label">
+              <button type="button" role="radio" aria-checked={mode === "voice"} className={mode === "voice" ? "mode-tab selected" : "mode-tab"} onClick={() => setMode("voice")}>
+                <strong>Live Chat</strong><span>Speak naturally with the guide. You can also type at any point.</span>
               </button>
-            )}
-            <button className="secondary" aria-pressed={voiceMuted} onClick={() => { if (connection.current) connection.current.audio.muted = !voiceMuted; setVoiceMuted(!voiceMuted); }}>
-              {voiceMuted ? "Turn guide voice on" : "Turn guide voice off"}
-            </button>
-            <button className="primary" onClick={goToReview}>Finish and review</button>
+              <button type="button" role="radio" aria-checked={mode === "text"} className={mode === "text" ? "mode-tab selected" : "mode-tab"} onClick={() => setMode("text")}>
+                <strong>Type</strong><span>Same questions, by text. No microphone or sound.</span>
+              </button>
+            </div>
+            <p id="identity-label">Would you like to identify yourself?</p>
+            <div className="identity-choice" role="radiogroup" aria-labelledby="identity-label">
+              <button type="button" role="radio" aria-checked={!identified} className={!identified ? "choice selected" : "choice"} onClick={() => setIdentified(false)}>Remain anonymous</button>
+              <button type="button" role="radio" aria-checked={identified} className={identified ? "choice selected" : "choice"} onClick={() => setIdentified(true)}>Identify myself</button>
+            </div>
+            {identified && <input className="name-input" aria-label="Your name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Your name" autoComplete="off" />}
+            <button className="primary" onClick={() => setStage("context")}>Begin {mode === "voice" ? "Live Chat" : "typing"}</button>
           </div>
-          <p className="quiet small">Nothing is saved until you review and submit on the next screen.</p>
         </section>
       )}
 
-      {stage === "review" && (
-        <section className="card">
-          <h1 ref={heading} tabIndex={-1}>Review before you submit</h1>
-          <p>This is the written record of the conversation. Edit or remove anything you said. Nothing has been saved yet.</p>
-          <div className="review-list">
-            {turns.length === 0 && <p className="quiet">No responses were captured.</p>}
-            {turns.map((turn, index) =>
-              turn.role === "guide" ? (
-                <p key={index} className="guide-line"><b>Guide</b>{turn.text}</p>
-              ) : (
-                <div key={index} className="edit-turn">
-                  <label htmlFor={`turn-${index}`}>Your response</label>
-                  <textarea id={`turn-${index}`} value={turn.text} rows={Math.min(8, Math.max(2, Math.ceil(turn.text.length / 80)))} onChange={(event) => editTurn(index, event.target.value)} />
-                  <button className="link" onClick={() => removeTurn(index)}>Remove this response</button>
-                </div>
-              ),
-            )}
-          </div>
+      {(stage === "context" || stage === "conversation" || stage === "review") && (
+        <section className="conversation">
+          <aside className="progress-panel" aria-label="Your path">
+            <span>YOUR PATH</span>
+            <ol>{path.map((step) => <li key={step.label} className={step.state} aria-current={step.state === "active" ? "step" : undefined}>{step.label}</li>)}</ol>
+          </aside>
 
-          <h2>Optional details</h2>
-          <div className="field-row">
-            <div>
-              <label htmlFor="role">Your role</label>
-              <select id="role" value={role} onChange={(event) => setRole(event.target.value)}>
+          {stage === "context" && (
+            <div className="question-shell">
+              <div className="question-kicker"><span>02</span><p>START WITH CONTEXT</p></div>
+              <h2 ref={heading} tabIndex={-1}>{campaign.contextPrompt}</h2>
+              <p className="quiet">Choose any that apply. This helps us understand your feedback in context.</p>
+              <div className="chip-grid">
+                {campaign.contextOptions.map((option) => (
+                  <button key={option} type="button" className={context.includes(option) ? "chip selected" : "chip"} aria-pressed={context.includes(option)} onClick={() => toggle(option)}>{option}</button>
+                ))}
+              </div>
+              <div ref={turnstileBox} />
+              <button className="primary" disabled={starting || needsCheck} onClick={() => void begin()}>{starting ? "Starting…" : "Start the conversation"}</button>
+            </div>
+          )}
+
+          {stage === "conversation" && (
+            <div className="question-shell">
+              <div className="question-kicker"><span>03</span><p>{unitUpper} LISTENING GUIDE</p></div>
+              <h2 ref={heading} tabIndex={-1} className={lastGuide.length > 150 ? "guide-line long" : "guide-line"}>{lastGuide || "Connecting to your guide…"}</h2>
+              <p className="quiet">Speak or type. Please focus on services and processes rather than named colleagues.</p>
+
+              <section className={`voice-studio ${status}${active ? " active" : ""}`}>
+                <div className="voice-topline"><span className="live-dot" /> <span role="status">{typing && status === "listening" ? "YOUR TURN" : statusLabel[status].toUpperCase()}</span></div>
+                <h3>{typing && status === "listening" ? "Type your response below." : statusHeading[status]}</h3>
+                <p>{typing ? "The guide replies in text. Send a message whenever you are ready." : "You can pause to think, and you can interrupt the guide at any time. Audio is not stored."}</p>
+                <div className="sound-wave" aria-hidden="true"><i /><i /><i /><i /><i /><i /><i /></div>
+                {hasMic && (
+                  <button className={micMuted ? "hold-to-talk muted" : "hold-to-talk"} aria-pressed={micMuted} onClick={() => { connection.current?.setMicrophoneMuted(!micMuted); setMicMuted(!micMuted); }}>
+                    {micMuted ? "Resume microphone" : "Pause microphone"}
+                  </button>
+                )}
+                <p className="voice-hint">{minutesLeft <= 2 && status !== "connecting" ? `About ${minutesLeft} ${minutesLeft === 1 ? "minute" : "minutes"} left.` : "Nothing is saved until you review and submit."}</p>
+              </section>
+
+              <div className="or-divider"><span>{typing ? "type your response" : "or type instead"}</span></div>
+              <form className="type-row" onSubmit={(event) => { event.preventDefault(); sendDraft(); }}>
+                <label htmlFor="draft" className="visually-hidden">Type a response</label>
+                <input id="draft" className="name-input" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Type your response here…" autoComplete="off" />
+                <button className="secondary" type="submit" disabled={!draft.trim()}>Send</button>
+              </form>
+
+              <div className="transcript" ref={captions} role="log" aria-label="Conversation so far" tabIndex={0}>
+                {turns.length === 0 && <p className="quiet">The conversation will appear here as text.</p>}
+                {turns.map((turn, index) => <p key={index} className={turn.role}><strong>{turn.role === "guide" ? "Guide:" : "You:"}</strong> {turn.text}</p>)}
+              </div>
+
+              <div className="response-actions">
+                {mode === "voice" ? (
+                  <button className="secondary" aria-pressed={voiceMuted} onClick={() => { if (connection.current) connection.current.audio.muted = !voiceMuted; setVoiceMuted(!voiceMuted); }}>
+                    {voiceMuted ? "Turn guide voice on" : "Turn guide voice off"}
+                  </button>
+                ) : <span />}
+                <button className="primary" onClick={goToReview}>Finish and review</button>
+              </div>
+            </div>
+          )}
+
+          {stage === "review" && (
+            <div className="question-shell review-shell">
+              <div className="question-kicker"><span>04</span><p>REVIEW</p></div>
+              <h2 ref={heading} tabIndex={-1}>Thank you for your perspective.</h2>
+              <p>Your transcript is shown below. Edit or remove anything you said. Nothing has been saved yet.</p>
+
+              <div className="transcript editable">
+                {turns.length === 0 && <p className="quiet">No responses were captured.</p>}
+                {turns.map((turn, index) =>
+                  turn.role === "guide" ? (
+                    <p key={index} className="guide"><strong>Guide:</strong> {turn.text}</p>
+                  ) : (
+                    <div key={index} className="edit-turn">
+                      <label htmlFor={`turn-${index}`}>Your response</label>
+                      <textarea id={`turn-${index}`} value={turn.text} rows={Math.min(8, Math.max(2, Math.ceil(turn.text.length / 70)))} onChange={(event) => editTurn(index, event.target.value)} />
+                      <button className="quiet-button" onClick={() => removeTurn(index)}>Remove this response</button>
+                    </div>
+                  ),
+                )}
+              </div>
+
+              <p id="rating-label"><strong>How was this {mode === "voice" ? "Live Chat" : "typed"} experience?</strong> <span className="quiet">Optional.</span></p>
+              <div className="rating-scale" role="radiogroup" aria-labelledby="rating-label">
+                {ratingLabels.map((label, index) => (
+                  <button key={label} type="button" role="radio" aria-checked={ease === index + 1} className={ease === index + 1 ? "selected" : ""} onClick={() => setEase(ease === index + 1 ? null : index + 1)}>
+                    <b>{index + 1}</b><span>{label}</span>
+                  </button>
+                ))}
+              </div>
+
+              <label htmlFor="role">Your role <span className="quiet">Optional.</span></label>
+              <select id="role" className="name-input" value={role} onChange={(event) => setRole(event.target.value)}>
                 <option value="">Not stated</option>
                 {campaign.roles.map((option) => <option key={option}>{option}</option>)}
               </select>
-            </div>
-            <div>
-              <label htmlFor="name">Your name <span className="quiet">Leave blank to stay anonymous.</span></label>
-              <input id="name" value={name} onChange={(event) => setName(event.target.value)} autoComplete="off" />
-            </div>
-          </div>
-          <fieldset>
-            <legend>How easy was this conversation to use? <span className="quiet">Optional.</span></legend>
-            <div className="scale">
-              {[1, 2, 3, 4, 5].map((value) => (
-                <label key={value} className="option"><input type="radio" name="ease" checked={ease === value} onChange={() => setEase(value)} /><span>{value}{value === 1 ? " Hard" : value === 5 ? " Easy" : ""}</span></label>
-              ))}
-            </div>
-          </fieldset>
-          <div className="controls">
-            <button className="link" onClick={() => { setTurns([]); setError(""); setDiscarded(true); setStage("thanks"); }}>Discard without submitting</button>
-            <button className="primary" disabled={submitting} onClick={() => void submit()}>{submitting ? "Submitting…" : "Submit feedback"}</button>
-          </div>
-        </section>
-      )}
+              <p className="quiet small">{identified && name.trim() ? `Submitting as ${name.trim()}.` : "Submitting anonymously."}</p>
 
-      {stage === "thanks" && (
-        <section className="card">
-          {discarded ? (
-            <><h1 ref={heading} tabIndex={-1}>Nothing was saved.</h1><p>Your conversation was discarded. You can close this page.</p></>
-          ) : (
-            <><h1 ref={heading} tabIndex={-1}>Thank you.</h1><p>Your feedback was submitted to {campaign.unit}. You can close this page.</p></>
+              <div className="response-actions">
+                <button className="quiet-button" onClick={() => { setTurns([]); setError(""); setDiscarded(true); setStage("thanks"); }}>Discard without submitting</button>
+                <button className="primary" disabled={submitting} onClick={() => void submit()}>{submitting ? "Submitting…" : "Submit feedback"}</button>
+              </div>
+            </div>
           )}
         </section>
       )}
 
-      <footer><span>{campaign.unitFullName}</span><span>University of St. Thomas</span></footer>
+      {stage === "thanks" && (
+        <section className="intro-panel thanks">
+          <div>
+            <p className="section-label">{discarded ? "DISCARDED" : "SUBMITTED"}</p>
+            <h2 ref={heading} tabIndex={-1}>{discarded ? "Nothing was saved." : "Thank you for contributing."}</h2>
+            <p>{discarded ? "Your conversation was discarded. You can close this page." : `Your feedback has been recorded for ${campaign.unit}'s service-improvement work. You can close this page.`}</p>
+          </div>
+        </section>
+      )}
+
+      <footer>
+        <span><Acronym name={campaign.unitFullName} /></span>
+        <span>University of St. Thomas</span>
+        <a className="leadership-link footer-link" href="/review">Leadership review</a>
+      </footer>
     </main>
   );
 }
