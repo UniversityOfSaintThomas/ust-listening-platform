@@ -13,7 +13,7 @@ First campaign: **STELAR**. Adding a unit (ITS, Aquinas AI) means adding one fil
 | Interviewer behavior | `src/worker/prompt.ts` | Built on the server per conversation. The browser cannot change it |
 | API | `src/worker/index.ts` | Cloudflare Worker: sessions, submissions, reviewer endpoints, daily cleanup |
 | Analysis | `src/worker/analysis.ts` | Codes each response into fixed themes, then synthesizes across responses |
-| Reviewer dashboard | `src/app/Dashboard.tsx` at `/review` | Protected by Cloudflare Access |
+| Reviewer dashboard | `src/app/Dashboard.tsx` at `/review` | Password sign-in |
 | Database | `migrations/` | Cloudflare D1 |
 | Campaigns | `campaigns/` | Questions, notice text, themes, retention |
 
@@ -33,7 +33,7 @@ Audio and transcript text are processed by OpenAI through its API to run the con
 - Six conversations per network per hour, and a daily cap per campaign.
 - A signed, single-use token is required to submit.
 - The OpenAI API key never reaches the browser.
-- Reviewer endpoints verify the Cloudflare Access token and a per-campaign reviewer list.
+- The reviewer dashboard requires a shared password, with a limit on wrong attempts. Cloudflare Access with a per-campaign reviewer list is supported as a stronger option.
 
 ## Local development
 
