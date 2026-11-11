@@ -19,12 +19,19 @@ First campaign: **STELAR**. Adding a unit (ITS, Aquinas AI) means adding one fil
 
 ## What is stored
 
-- The written transcript the participant approved, the services they selected, and optional role, name, and ease rating.
-- Submission time rounded to the hour.
-- No audio. No IP addresses. A salted hash of the IP that rotates daily is kept for 48 hours for rate limiting and is not linked to any submission.
+Responses are anonymous by design.
+
+- The transcript the participant approved, after an automated step has replaced names, contact details, and similar identifying details with placeholders such as `[name]`. If that step fails, nothing is saved and the participant is asked to submit again.
+- The services they selected, an optional role (faculty, staff, student), and an optional ease rating.
+- The submission date, to the day.
+- No names, no email addresses, no audio, no IP addresses, and no per-visit logs. A salted hash of the IP that rotates daily is kept for 48 hours for rate limiting and is not linked to any submission.
 - Transcripts are deleted after the campaign's `retentionDays`.
 
-Audio and transcript text are processed by OpenAI through its API to run the conversation and the analysis. Review OpenAI's current API data terms before launch and keep the participant notice in `campaigns/stelar.ts` accurate.
+Participants must tick a statement that they will be talking with an AI guide and that AI tools analyze and report the findings.
+
+Audio and transcript text are processed by OpenAI through its API to run the conversation, the redaction, and the analysis. Under OpenAI's API terms at the time of writing, this data is not used for training and safety logs are kept for up to 30 days. Review the current terms before launch and keep the participant notice in `campaigns/stelar.ts` accurate.
+
+Automated redaction reduces risk. It does not guarantee anonymity: a person can still be recognized from what they describe. Reviewers should delete any response that identifies someone.
 
 ## Protections
 

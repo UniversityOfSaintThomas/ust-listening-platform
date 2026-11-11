@@ -18,8 +18,9 @@
       "migrations_dir": "migrations"
     }
   ],
-  // Keeps error logs in the Cloudflare dashboard. Logs never include transcripts or keys.
-  "observability": { "enabled": true },
+  // Keeps error messages the app writes itself. Per-request logs are off, so visits
+  // are not recorded. Logs never include transcripts or keys.
+  "observability": { "enabled": true, "logs": { "enabled": true, "invocation_logs": false } },
   // Daily cleanup: retention purge and rate-limit log purge (08:17 UTC).
   "triggers": { "crons": ["17 8 * * *"] },
   "vars": {
