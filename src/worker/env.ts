@@ -13,4 +13,6 @@ export interface Env {
   ACCESS_AUD?: string;
   REVIEWERS?: string;
   DEV_REVIEWER_EMAIL?: string;
+  /** Shared password for the reviewer dashboard. */
+  DASHBOARD_PASSWORD?: string;
 }

@@ -78,10 +78,38 @@ async function accessKeys(teamDomain: string): Promise<Jwk[]> {
 }
 
 /**
- * Returns the signed-in reviewer's email, or null. In production this verifies the
- * Cloudflare Access token. DEV_REVIEWER_EMAIL works only on localhost.
+ * Returns the signed-in reviewer, or null. Accepts the shared-password cookie, or a
+ * Cloudflare Access token when Access is configured. DEV_REVIEWER_EMAIL works only on localhost.
  */
+export const SHARED_REVIEWER = "shared-password";
+const REVIEW_COOKIE = "review_session";
+const REVIEW_HOURS = 12;
+
+/** Compares a submitted password to the configured one without leaking length or timing. */
+export async function passwordMatches(candidate: string, env: Env): Promise<boolean> {
+  if (!env.DASHBOARD_PASSWORD || !candidate) return false;
+  const [a, b] = await Promise.all([hmac(env.SESSION_SECRET, `pw|${candidate}`), hmac(env.SESSION_SECRET, `pw|${env.DASHBOARD_PASSWORD}`)]);
+  return safeEqual(a, b);
+}
+
+/** A signed, expiring cookie. Changing the password signs everyone out. */
+export async function reviewCookie(env: Env): Promise<string> {
+  const expires = Date.now() + REVIEW_HOURS * 60 * 60 * 1000;
+  const signature = await hmac(env.SESSION_SECRET, `review|${expires}|${env.DASHBOARD_PASSWORD}`);
+  return `${REVIEW_COOKIE}=${expires}.${signature}; Path=/api/review; Max-Age=${REVIEW_HOURS * 3600}; HttpOnly; Secure; SameSite=Strict`;
+}
+
+export const clearedReviewCookie = `${REVIEW_COOKIE}=; Path=/api/review; Max-Age=0; HttpOnly; Secure; SameSite=Strict`;
+
+async function hasReviewCookie(request: Request, env: Env): Promise<boolean> {
+  if (!env.DASHBOARD_PASSWORD) return false;
+  const match = (request.headers.get("cookie") || "").match(new RegExp(`(?:^|;\\s*)${REVIEW_COOKIE}=(\\d+)\\.([A-Za-z0-9_-]+)`));
+  if (!match || Number(match[1]) < Date.now()) return false;
+  return safeEqual(match[2], await hmac(env.SESSION_SECRET, `review|${match[1]}|${env.DASHBOARD_PASSWORD}`));
+}
+
 export async function reviewerEmail(request: Request, env: Env): Promise<string | null> {
+  if (await hasReviewCookie(request, env)) return SHARED_REVIEWER;
   const host = new URL(request.url).hostname;
   if (env.DEV_REVIEWER_EMAIL && (host === "localhost" || host === "127.0.0.1")) return env.DEV_REVIEWER_EMAIL.toLowerCase();
   if (!env.ACCESS_TEAM_DOMAIN || !env.ACCESS_AUD) return null;
@@ -110,6 +138,7 @@ export async function reviewerEmail(request: Request, env: Env): Promise<string 
 
 /** Campaign slugs this reviewer may open, from the REVIEWERS variable. */
 export function reviewerCampaigns(email: string, env: Env, allSlugs: string[]): string[] {
+  if (email === SHARED_REVIEWER) return allSlugs; // The shared password opens every campaign.
   let map: Record<string, string[]> = {};
   try {
     map = JSON.parse(env.REVIEWERS || "{}") as Record<string, string[]>;

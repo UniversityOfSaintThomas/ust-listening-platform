@@ -3,7 +3,7 @@ import type { Analysis, Campaign, Mode, PublicCampaign, ReviewData, ReviewSubmis
 import { analyzeSubmission, synthesize } from "./analysis";
 import type { Env } from "./env";
 import { buildGuideInstructions, transcriptionPrompt } from "./prompt";
-import { ipHash, issueSubmitToken, readSubmitToken, reviewerCampaigns, reviewerEmail, verifyTurnstile } from "./security";
+import { clearedReviewCookie, ipHash, issueSubmitToken, passwordMatches, readSubmitToken, reviewCookie, reviewerCampaigns, reviewerEmail, SHARED_REVIEWER, verifyTurnstile } from "./security";
 
 const SESSIONS_PER_IP_PER_HOUR = 6;
 
@@ -193,12 +193,37 @@ function toCsv(rows: ReviewSubmission[]): string {
   return [header.join(","), ...lines].join("\r\n");
 }
 
+const LOGIN_ATTEMPTS = 5;
+const LOGIN_WINDOW_SECONDS = 15 * 60;
+
+async function login(request: Request, env: Env): Promise<Response> {
+  if (!env.DASHBOARD_PASSWORD || !env.SESSION_SECRET) return json({ error: "The review password has not been set up yet." }, 503);
+  const now = Math.floor(Date.now() / 1000);
+  const hash = await ipHash(request, env);
+  const recent = await env.DB.prepare("SELECT COUNT(*) AS n FROM login_attempts WHERE ip_hash = ? AND created_at > ?").bind(hash, now - LOGIN_WINDOW_SECONDS).first<{ n: number }>();
+  if ((recent?.n || 0) >= LOGIN_ATTEMPTS) return json({ error: "Too many attempts. Please wait 15 minutes and try again." }, 429);
+  const body = (await request.json().catch(() => null)) as { password?: unknown } | null;
+  if (!(await passwordMatches(text(body?.password, 200), env))) {
+    await env.DB.prepare("INSERT INTO login_attempts (ip_hash, created_at) VALUES (?, ?)").bind(hash, now).run();
+    return json({ error: "That password is not correct." }, 401);
+  }
+  const response = json({ ok: true });
+  response.headers.append("set-cookie", await reviewCookie(env));
+  return response;
+}
+
 async function review(request: Request, env: Env, ctx: ExecutionContext, path: string[]): Promise<Response> {
+  if (path[0] === "login" && request.method === "POST") return login(request, env);
+  if (path[0] === "logout" && request.method === "POST") {
+    const response = json({ ok: true });
+    response.headers.append("set-cookie", clearedReviewCookie);
+    return response;
+  }
   const email = await reviewerEmail(request, env);
-  if (!email) return json({ error: "Sign in through the reviewer link to open this page." }, 401);
+  if (!email) return json({ error: "Enter the review password to open this page." }, 401);
   const allowed = reviewerCampaigns(email, env, Object.keys(campaigns));
   if (path[0] === "me" && request.method === "GET") {
-    return json({ email, campaigns: allowed.map((slug) => ({ slug, unit: campaigns[slug].unit })) });
+    return json({ email: email === SHARED_REVIEWER ? "" : email, campaigns: allowed.map((slug) => ({ slug, unit: campaigns[slug].unit })) });
   }
 
   const campaign = campaigns[path[0]];
@@ -259,6 +284,7 @@ async function review(request: Request, env: Env, ctx: ExecutionContext, path: s
 async function cleanup(env: Env): Promise<void> {
   const now = Math.floor(Date.now() / 1000);
   await env.DB.prepare("DELETE FROM sessions WHERE created_at < ?").bind(now - 2 * 86400).run();
+  await env.DB.prepare("DELETE FROM login_attempts WHERE created_at < ?").bind(now - 2 * 86400).run();
   for (const campaign of Object.values(campaigns)) {
     await env.DB.prepare("DELETE FROM submissions WHERE campaign = ? AND created_at < ?").bind(campaign.slug, now - campaign.retentionDays * 86400).run();
   }
