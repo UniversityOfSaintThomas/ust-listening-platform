@@ -17,9 +17,9 @@ export type Campaign = {
   headline: string;
   invitation: string;
   /** One or two sentences on why this feedback is collected. */
-  purpose?: string;
+  purpose: string;
   /** The statement participants must tick before starting. */
-  consentLabel?: string;
+  consentLabel: string;
   /** Plain-language notice shown before the conversation starts. */
   notice: string[];
   whoSeesResponses: string;
@@ -63,7 +63,6 @@ export type ReviewSubmission = {
   createdAt: number;
   mode: Mode;
   role: string;
-  name?: string;
   context: string[];
   ease: number | null;
   transcript: Turn[];
