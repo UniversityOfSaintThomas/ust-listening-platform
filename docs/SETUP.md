@@ -40,7 +40,7 @@ This repository is public. Never commit keys, reviewer email addresses, or parti
 
 Every push to `main` deploys. To deploy without a code change: Actions, Deploy, Run workflow.
 
-The workflow creates the database on first run, applies migrations, deploys the site, and copies the secrets above into Cloudflare. It also generates the session signing secret once. The site address appears in the Deploy step's log (`https://ust-listening-platform.<account>.workers.dev`).
+The workflow creates the database on first run, applies migrations, deploys the site, and copies the secrets above into Cloudflare. It also generates the session signing secret once. The site address appears in the Deploy step's log (`https://stelar-listening.<account>.workers.dev`).
 
 ## 5. Reviewer sign-in
 
