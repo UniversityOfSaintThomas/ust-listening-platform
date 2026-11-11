@@ -6,18 +6,17 @@ export const stelar: Campaign = {
   unit: "STELAR",
   unitSpoken: "stellar",
   unitFullName: "Strategic Transformation in Education, Learning, And Research",
-  headline: "Tell us how STELAR can serve you better.",
-  invitation:
-    "A short conversation, by voice or by typing, about what is working and what should change. It takes about five to eight minutes.",
+  headline: "What could feel more possible?",
+  invitation: "Share a perspective. Help STELAR make the next learning experience more human, more useful, and more connected. It takes about five to eight minutes.",
   notice: [
     "This is for improving STELAR services. It is not an evaluation of any individual.",
-    "There is no sign-in. Your name is stored only if you choose to give it at the end.",
+    "There is no sign-in. Your response is anonymous unless you choose to identify yourself.",
     "You will talk with an AI guide. Your audio is processed by OpenAI to run the conversation and is not kept by this site. Only the written transcript is saved, and only after you review it and choose to submit.",
     "If you want to stay anonymous, avoid details that would identify you. Please describe services and processes instead of naming colleagues.",
     "This is not a channel for urgent problems or formal complaints. Those should go to the IT help desk, your supervisor, or Human Resources.",
   ],
   whoSeesResponses:
-    "STELAR leadership reviews themes and summaries across all responses. A small number of named reviewers can read individual transcripts. Transcripts are deleted after 12 months.",
+    "STELAR leadership reviews themes and summaries across all responses and can read individual transcripts. Transcripts are deleted after 12 months.",
   contextPrompt: "Which STELAR services have you used in the past year?",
   contextOptions: [
     "Training or workshops",
