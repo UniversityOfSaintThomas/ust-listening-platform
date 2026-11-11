@@ -1,0 +1,5 @@
+# Copy to .dev.vars for local development. Never commit .dev.vars.
+OPENAI_API_KEY=sk-...
+SESSION_SECRET=any-long-random-string
+# Lets you open the dashboard on localhost without Cloudflare Access. Ignored on any other host.
+DEV_REVIEWER_EMAIL=you@stthomas.edu

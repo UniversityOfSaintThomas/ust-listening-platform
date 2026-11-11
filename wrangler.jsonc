@@ -1,0 +1,40 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ust-listening-platform",
+  "main": "src/worker/index.ts",
+  "compatibility_date": "2026-06-01",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "listening",
+      // Replace after running: npx wrangler d1 create listening
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  // Daily cleanup: retention purge and rate-limit log purge (08:17 UTC).
+  "triggers": { "crons": ["17 8 * * *"] },
+  "vars": {
+    // Confirm current model names at https://platform.openai.com/docs/models before launch.
+    "REALTIME_MODEL": "gpt-realtime-2",
+    "TRANSCRIBE_MODEL": "gpt-4o-transcribe",
+    "ANALYSIS_MODEL": "gpt-4.1-mini",
+    "GUIDE_VOICE": "cedar",
+    // Public Turnstile site key. Leave empty to disable the check (local development only).
+    "TURNSTILE_SITE_KEY": "",
+    // Cloudflare Access, for the reviewer dashboard. Example: "yourteam.cloudflareaccess.com"
+    "ACCESS_TEAM_DOMAIN": "",
+    "ACCESS_AUD": ""
+  }
+  // Secrets (set with `npx wrangler secret put NAME`, never committed):
+  //   OPENAI_API_KEY, SESSION_SECRET, TURNSTILE_SECRET
+  //   REVIEWERS: JSON map of campaign slug to reviewer emails, for example
+  //   {"stelar":["name@stthomas.edu"]}. "*" as the key grants every campaign.
+  //   Kept as a secret so reviewer addresses never appear in this public repository.
+}
