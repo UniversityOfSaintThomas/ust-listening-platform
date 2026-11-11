@@ -1,6 +1,6 @@
 import { campaigns, defaultCampaign } from "../../campaigns";
 import type { Analysis, Campaign, Mode, PublicCampaign, ReviewData, ReviewSubmission, Synthesis, Turn } from "../shared/types";
-import { analyzeSubmission, synthesize } from "./analysis";
+import { analyzeSubmission, redactTranscript, synthesize } from "./analysis";
 import type { Env } from "./env";
 import { buildGuideInstructions, transcriptionPrompt } from "./prompt";
 import { clearedReviewCookie, ipHash, issueSubmitToken, passwordMatches, readSubmitToken, reviewCookie, reviewerCampaigns, reviewerEmail, SHARED_REVIEWER, verifyTurnstile } from "./security";
@@ -37,6 +37,7 @@ async function startSession(request: Request, env: Env): Promise<Response> {
   const campaign = campaigns[text(body?.slug, 60)];
   if (!campaign) return json({ error: "That feedback page was not found." }, 404);
   if (campaign.status !== "open") return json({ error: "This feedback page is closed." }, 403);
+  if (body?.consent !== true) return json({ error: "Please confirm the notice before starting." }, 400);
   if (!(await verifyTurnstile(body?.turnstileToken, request, env))) return json({ error: "We could not confirm your browser. Please reload the page and try again." }, 403);
 
   const now = Math.floor(Date.now() / 1000);
@@ -48,7 +49,7 @@ async function startSession(request: Request, env: Env): Promise<Response> {
 
   const mode: Mode = body?.mode === "text" ? "text" : "voice";
   const context = cleanContext(body?.context, campaign);
-  const upstream = await fetch("https://api.openai.com/v1/realtime/client_secrets", {
+  const upstream = await fetch(`${env.OPENAI_BASE_URL || "https://api.openai.com/v1"}/realtime/client_secrets`, {
     method: "POST",
     headers: { authorization: `Bearer ${env.OPENAI_API_KEY}`, "content-type": "application/json" },
     body: JSON.stringify({
@@ -114,6 +115,21 @@ async function submit(request: Request, env: Env, ctx: ExecutionContext): Promis
   if (!transcript.some((turn) => turn.role === "participant")) return json({ error: "There is nothing to submit yet. Add at least one response." }, 400);
   if (JSON.stringify(transcript).length > 120_000) return json({ error: "That transcript is too long to submit." }, 413);
 
+  const spent = await env.DB.prepare("SELECT used FROM sessions WHERE id = ?").bind(sessionId).first<{ used: number }>();
+  if (spent?.used) return json({ error: "This conversation was already submitted." }, 409);
+
+  // Identifying details are removed before anything is stored. If that step fails,
+  // nothing is saved and the participant can press Submit again.
+  if (!env.OPENAI_API_KEY) return json({ error: "Responses cannot be saved right now. Please try again shortly." }, 503);
+  let redacted: Turn[] | null = null;
+  for (let attempt = 0; attempt < 2 && !redacted; attempt += 1) {
+    redacted = await redactTranscript(env, campaign, transcript).catch((error: unknown) => {
+      console.error("Redaction failed", error instanceof Error ? error.message : "unknown");
+      return null;
+    });
+  }
+  if (!redacted) return json({ error: "Your response could not be saved just now. Nothing was stored. Please press Submit again." }, 503);
+
   // Single use: the first submit for a session wins, repeats are rejected.
   const claimed = await env.DB.prepare("UPDATE sessions SET used = 1 WHERE id = ? AND used = 0").bind(sessionId).run();
   if (!claimed.meta.changes) return json({ error: "This conversation was already submitted." }, 409);
@@ -122,12 +138,12 @@ async function submit(request: Request, env: Env, ctx: ExecutionContext): Promis
   const role = campaign.roles.includes(text(body?.role, 60)) ? text(body?.role, 60) : "";
   const ease = typeof body?.ease === "number" && Number.isInteger(body.ease) && body.ease >= 1 && body.ease <= 5 ? body.ease : null;
   const id = crypto.randomUUID();
-  const hour = Math.floor(Date.now() / 3_600_000) * 3600;
-  await env.DB.prepare("INSERT INTO submissions (id, campaign, created_at, mode, role, name, context, transcript, ease) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
-    .bind(id, campaign.slug, hour, body?.mode === "text" ? "text" : "voice", role || null, text(body?.name, 120) || null, JSON.stringify(context), JSON.stringify(transcript), ease)
+  const day = Math.floor(Date.now() / 86_400_000) * 86_400; // Stored to the day, not the minute.
+  await env.DB.prepare("INSERT INTO submissions (id, campaign, created_at, mode, role, context, transcript, ease) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+    .bind(id, campaign.slug, day, body?.mode === "text" ? "text" : "voice", role || null, JSON.stringify(context), JSON.stringify(redacted), ease)
     .run();
 
-  ctx.waitUntil(runAnalysis(env, campaign, id, transcript, context));
+  ctx.waitUntil(runAnalysis(env, campaign, id, redacted, context));
   return json({ ok: true });
 }
 
@@ -150,7 +166,6 @@ function toSubmission(row: Row): ReviewSubmission {
     createdAt: Number(row.created_at) || 0,
     mode: row.mode === "text" ? "text" : "voice",
     role: text(row.role, 60),
-    name: text(row.name, 120),
     context: parseJson<string[]>(row.context, []),
     ease: typeof row.ease === "number" ? row.ease : null,
     transcript: parseJson<Turn[]>(row.transcript, []),
@@ -172,13 +187,12 @@ function csvCell(value: string | number | null): string {
 
 function toCsv(rows: ReviewSubmission[]): string {
   const items = (list?: { theme: string; point: string }[]) => (list || []).map((item) => `[${item.theme}] ${item.point}`).join(" | ");
-  const header = ["date", "mode", "role", "name", "ease", "services_used", "sentiment", "summary", "strengths", "frictions", "suggestions", "needs_attention", "participant_words"];
+  const header = ["date", "mode", "role", "ease", "services_used", "sentiment", "summary", "strengths", "frictions", "suggestions", "needs_attention", "participant_words"];
   const lines = rows.map((row) =>
     [
       new Date(row.createdAt * 1000).toISOString().slice(0, 10),
       row.mode,
       row.role,
-      row.name,
       row.ease,
       row.context.join("; "),
       row.analysis?.sentiment || "",
