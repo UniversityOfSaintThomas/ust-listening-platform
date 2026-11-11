@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "ust-listening-platform",
+  "name": "stelar-listening",
   "main": "src/worker/index.ts",
   "compatibility_date": "2026-06-01",
   "assets": {
