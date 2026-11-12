@@ -17,7 +17,11 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
       - run: npm run build
+      - name: Check dependencies for known vulnerabilities
+        run: npm audit --omit=dev --audit-level=high
 
   deploy:
     needs: check
@@ -60,7 +64,7 @@ jobs:
         run: npx wrangler d1 migrations apply listening --remote
 
       - name: Deploy
-        run: npx wrangler deploy
+        run: npx wrangler deploy --env=""
 
       - name: Sync secrets to Cloudflare
         env:
