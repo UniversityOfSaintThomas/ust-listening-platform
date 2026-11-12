@@ -1,0 +1,4 @@
+{
+  "extends": "./tsconfig.worker.json",
+  "include": ["tests", "src/worker", "src/shared", "campaigns"]
+}

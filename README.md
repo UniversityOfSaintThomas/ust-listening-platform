@@ -42,6 +42,21 @@ Automated redaction reduces risk. It does not guarantee anonymity: a person can 
 - The OpenAI API key never reaches the browser.
 - The reviewer dashboard requires a shared password, with a limit on wrong attempts. Cloudflare Access with a per-campaign reviewer list is supported as a stronger option.
 
+## Documentation
+
+| File | Contents |
+|---|---|
+| [docs/SPEC.md](docs/SPEC.md) | Requirements and how each is verified |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Components, data flow, stored data, outside services |
+| [docs/DECISIONS.md](docs/DECISIONS.md) | Why it is built this way |
+| [docs/OPERATIONS.md](docs/OPERATIONS.md) | Release, rollback, monitoring, troubleshooting |
+| [docs/SETUP.md](docs/SETUP.md) | First-time setup |
+| [AGENTS.md](AGENTS.md) | Rules for AI coding assistants |
+
+## Checks
+
+`npm run check` runs the typecheck, lint, tests, and build. The deploy pipeline runs the same checks plus a dependency vulnerability scan, and does not deploy if any fail.
+
 ## Local development
 
 ```bash

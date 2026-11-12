@@ -34,6 +34,32 @@
     // Cloudflare Access, for the reviewer dashboard. Example: "yourteam.cloudflareaccess.com"
     "ACCESS_TEAM_DOMAIN": "",
     "ACCESS_AUD": ""
+  },
+  // A separate copy for trying changes before they reach participants. It has its own
+  // address and its own empty database. Deployed by the "Deploy staging" workflow.
+  "env": {
+    "staging": {
+      "name": "stelar-listening-staging",
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "listening-staging",
+          "database_id": "11111111-1111-1111-1111-111111111111",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "triggers": { "crons": [] },
+      "vars": {
+        "REALTIME_MODEL": "gpt-realtime-2",
+        "TRANSCRIBE_MODEL": "gpt-4o-transcribe",
+        "ANALYSIS_MODEL": "gpt-4.1-mini",
+        "GUIDE_VOICE": "cedar",
+        // No bot check on staging. Rate limits still apply.
+        "TURNSTILE_SITE_KEY": "",
+        "ACCESS_TEAM_DOMAIN": "",
+        "ACCESS_AUD": ""
+      }
+    }
   }
   // Secrets (set with `npx wrangler secret put NAME`, never committed):
   //   OPENAI_API_KEY, SESSION_SECRET, TURNSTILE_SECRET
