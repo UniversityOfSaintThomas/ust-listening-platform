@@ -2,6 +2,7 @@ import { campaigns, defaultCampaign } from "../../campaigns";
 import type { Analysis, Campaign, Mode, PublicCampaign, ReviewData, ReviewSubmission, Synthesis, Turn } from "../shared/types";
 import { analyzeSubmission, redactTranscript, synthesize } from "./analysis";
 import type { Env } from "./env";
+import { cleanTranscript, csvCell, text } from "./format";
 import { buildGuideInstructions, transcriptionPrompt } from "./prompt";
 import { clearedReviewCookie, ipHash, issueSubmitToken, passwordMatches, readSubmitToken, reviewCookie, reviewerCampaigns, reviewerEmail, SHARED_REVIEWER, verifyTurnstile } from "./security";
 
@@ -10,7 +11,6 @@ const SESSIONS_PER_IP_PER_HOUR = 6;
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
 
-const text = (value: unknown, max: number) => (typeof value === "string" ? value.trim().slice(0, max) : "");
 
 function parseJson<T>(value: unknown, fallback: T): T {
   if (typeof value !== "string") return fallback;
@@ -92,18 +92,6 @@ async function startSession(request: Request, env: Env): Promise<Response> {
   return json({ clientSecret: secret.value, submitToken: await issueSubmitToken(sessionId, campaign.slug, env) });
 }
 
-function cleanTranscript(value: unknown): Turn[] {
-  if (!Array.isArray(value)) return [];
-  const turns: Turn[] = [];
-  for (const item of value.slice(0, 120)) {
-    const record = item as Record<string, unknown> | null;
-    const role = record?.role === "guide" ? "guide" : record?.role === "participant" ? "participant" : null;
-    const body = text(record?.text, 6000);
-    if (role && body) turns.push({ role, text: body });
-  }
-  return turns;
-}
-
 async function submit(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
   const campaign = campaigns[text(body?.slug, 60)];
@@ -179,12 +167,6 @@ async function loadSubmissions(env: Env, slug: string): Promise<ReviewSubmission
   return (result.results || []).map(toSubmission);
 }
 
-function csvCell(value: string | number | null): string {
-  let cell = value === null ? "" : String(value);
-  if (/^[=+\-@\t\r]/.test(cell)) cell = `'${cell}`; // Prevent spreadsheet formula injection.
-  return `"${cell.replace(/"/g, '""')}"`;
-}
-
 function toCsv(rows: ReviewSubmission[]): string {
   const items = (list?: { theme: string; point: string }[]) => (list || []).map((item) => `[${item.theme}] ${item.point}`).join(" | ");
   const header = ["date", "mode", "role", "ease", "services_used", "sentiment", "summary", "strengths", "frictions", "suggestions", "needs_attention", "participant_words"];
@@ -257,7 +239,7 @@ async function review(request: Request, env: Env, ctx: ExecutionContext, path: s
   }
 
   if (path[1] === "export.csv" && request.method === "GET") {
-    return new Response(`﻿${toCsv(await loadSubmissions(env, campaign.slug))}`, {
+    return new Response(`\uFEFF${toCsv(await loadSubmissions(env, campaign.slug))}`, {
       headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": `attachment; filename="${campaign.slug}-feedback.csv"`, "cache-control": "no-store" },
     });
   }
