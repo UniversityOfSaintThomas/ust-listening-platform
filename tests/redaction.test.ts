@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { campaigns } from "../campaigns";
+import { stelar } from "../campaigns/stelar";
 import type { Turn } from "../src/shared/types";
 import { redactTranscript, scrubPatterns } from "../src/worker/analysis";
 import type { Env } from "../src/worker/env";
 
 const env = { OPENAI_API_KEY: "test", ANALYSIS_MODEL: "test-model", OPENAI_BASE_URL: "https://model.test" } as Env;
-const campaign = campaigns.stelar;
+const campaign = stelar;
 const transcript: Turn[] = [
   { role: "guide", text: "What is STELAR doing well for you?" },
   { role: "participant", text: "Dr. Smith ran a useful Canvas workshop. Write to me at pat@example.edu." },
