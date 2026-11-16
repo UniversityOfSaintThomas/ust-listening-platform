@@ -52,6 +52,7 @@ jobs:
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           DASHBOARD_PASSWORD: ${{ secrets.DASHBOARD_PASSWORD }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
         run: |
           if ! npx wrangler secret list --env staging | grep -q '"SESSION_SECRET"'; then
             SESSION_SECRET=$(openssl rand -base64 48)
