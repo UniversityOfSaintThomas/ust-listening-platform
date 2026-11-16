@@ -77,39 +77,81 @@ async function accessKeys(teamDomain: string): Promise<Jwk[]> {
   return keys;
 }
 
-/**
- * Returns the signed-in reviewer, or null. Accepts the shared-password cookie, or a
- * Cloudflare Access token when Access is configured. DEV_REVIEWER_EMAIL works only on localhost.
- */
-export const SHARED_REVIEWER = "shared-password";
 const REVIEW_COOKIE = "review_session";
 const REVIEW_HOURS = 12;
 
-/** Compares a submitted password to the configured one without leaking length or timing. */
-export async function passwordMatches(candidate: string, env: Env): Promise<boolean> {
-  if (!env.DASHBOARD_PASSWORD || !candidate) return false;
-  const [a, b] = await Promise.all([hmac(env.SESSION_SECRET, `pw|${candidate}`), hmac(env.SESSION_SECRET, `pw|${env.DASHBOARD_PASSWORD}`)]);
+/**
+ * What a password sign-in opens. "admin" manages campaigns and sees everything, "all"
+ * sees every campaign's results, and "campaigns" sees only the listed ones. Each
+ * campaign grant carries the start of that campaign's password hash, so changing a
+ * campaign's password ends the sessions that used the old one.
+ */
+export type Scope = { kind: "admin" } | { kind: "all" } | { kind: "campaigns"; grants: { slug: string; mark: string }[] };
+
+async function matches(candidate: string, expected: string | undefined, env: Env): Promise<boolean> {
+  if (!expected || !candidate) return false;
+  const [a, b] = await Promise.all([hmac(env.SESSION_SECRET, `pw|${candidate}`), hmac(env.SESSION_SECRET, `pw|${expected}`)]);
   return safeEqual(a, b);
 }
 
-/** A signed, expiring cookie. Changing the password signs everyone out. */
-export async function reviewCookie(env: Env): Promise<string> {
+/** Compares a submitted password to the shared review password without leaking length or timing. */
+export const passwordMatches = (candidate: string, env: Env) => matches(candidate, env.DASHBOARD_PASSWORD, env);
+export const adminPasswordMatches = (candidate: string, env: Env) => matches(candidate, env.ADMIN_PASSWORD, env);
+
+/** Keyed hash of a campaign's review password. Useless without the site's signing secret. */
+export const campaignPasswordHash = (password: string, env: Env) => hmac(env.SESSION_SECRET, `campaign-pw|${password}`);
+export const passwordMark = (hash: string) => hash.slice(0, 12);
+
+/** Link token that lets an admin try a campaign before it is open. */
+export const previewToken = async (slug: string, env: Env) => (await hmac(env.SESSION_SECRET, `preview|${slug}`)).slice(0, 24);
+
+function encodeScope(scope: Scope): string {
+  if (scope.kind !== "campaigns") return scope.kind;
+  return `c:${scope.grants.map((grant) => `${grant.slug}~${grant.mark}`).join(",")}`;
+}
+
+function decodeScope(value: string): Scope | null {
+  if (value === "admin" || value === "all") return { kind: value };
+  if (!value.startsWith("c:")) return null;
+  const grants = value.slice(2).split(",").map((part) => part.split("~")).filter((pair) => pair.length === 2 && pair[0] && pair[1]).map(([slug, mark]) => ({ slug, mark }));
+  return grants.length ? { kind: "campaigns", grants } : null;
+}
+
+/** The password a scope's signature is tied to. Changing it signs those sessions out. */
+const binding = (scope: Scope, env: Env) => (scope.kind === "admin" ? env.ADMIN_PASSWORD : scope.kind === "all" ? env.DASHBOARD_PASSWORD : "campaign");
+
+/** A signed, expiring cookie. */
+export async function reviewCookie(env: Env, scope: Scope = { kind: "all" }): Promise<string> {
   const expires = Date.now() + REVIEW_HOURS * 60 * 60 * 1000;
-  const signature = await hmac(env.SESSION_SECRET, `review|${expires}|${env.DASHBOARD_PASSWORD}`);
-  return `${REVIEW_COOKIE}=${expires}.${signature}; Path=/api/review; Max-Age=${REVIEW_HOURS * 3600}; HttpOnly; Secure; SameSite=Strict`;
+  const encoded = base64Url(encoder.encode(encodeScope(scope)));
+  const signature = await hmac(env.SESSION_SECRET, `review|${expires}|${encoded}|${binding(scope, env)}`);
+  return `${REVIEW_COOKIE}=${expires}.${encoded}.${signature}; Path=/api/review; Max-Age=${REVIEW_HOURS * 3600}; HttpOnly; Secure; SameSite=Strict`;
 }
 
 export const clearedReviewCookie = `${REVIEW_COOKIE}=; Path=/api/review; Max-Age=0; HttpOnly; Secure; SameSite=Strict`;
 
-async function hasReviewCookie(request: Request, env: Env): Promise<boolean> {
-  if (!env.DASHBOARD_PASSWORD) return false;
-  const match = (request.headers.get("cookie") || "").match(new RegExp(`(?:^|;\\s*)${REVIEW_COOKIE}=(\\d+)\\.([A-Za-z0-9_-]+)`));
-  if (!match || Number(match[1]) < Date.now()) return false;
-  return safeEqual(match[2], await hmac(env.SESSION_SECRET, `review|${match[1]}|${env.DASHBOARD_PASSWORD}`));
+/** The scope carried by a valid sign-in cookie, or null. */
+export async function cookieScope(request: Request, env: Env): Promise<Scope | null> {
+  if (!env.SESSION_SECRET) return null;
+  const match = (request.headers.get("cookie") || "").match(new RegExp(`(?:^|;\\s*)${REVIEW_COOKIE}=(\\d+)\\.([A-Za-z0-9_-]+)\\.([A-Za-z0-9_-]+)`));
+  if (!match || Number(match[1]) < Date.now()) return null;
+  let scope: Scope | null = null;
+  try {
+    scope = decodeScope(new TextDecoder().decode(fromBase64Url(match[2])));
+  } catch {
+    return null;
+  }
+  if (!scope) return null;
+  const bound = binding(scope, env);
+  if (!bound) return null;
+  return safeEqual(match[3], await hmac(env.SESSION_SECRET, `review|${match[1]}|${match[2]}|${bound}`)) ? scope : null;
 }
 
+/**
+ * Returns the reviewer signed in through Cloudflare Access, or null. Used only when
+ * Access is configured. DEV_REVIEWER_EMAIL works only on localhost.
+ */
 export async function reviewerEmail(request: Request, env: Env): Promise<string | null> {
-  if (await hasReviewCookie(request, env)) return SHARED_REVIEWER;
   const host = new URL(request.url).hostname;
   if (env.DEV_REVIEWER_EMAIL && (host === "localhost" || host === "127.0.0.1")) return env.DEV_REVIEWER_EMAIL.toLowerCase();
   if (!env.ACCESS_TEAM_DOMAIN || !env.ACCESS_AUD) return null;
@@ -136,9 +178,10 @@ export async function reviewerEmail(request: Request, env: Env): Promise<string 
   }
 }
 
-/** Campaign slugs this reviewer may open, from the REVIEWERS variable. */
+export type Reviewer = { role: "admin" | "reviewer"; email: string; slugs: string[] };
+
+/** Campaign slugs a named reviewer may open, from the REVIEWERS variable. "admin" lists people who manage campaigns. */
 export function reviewerCampaigns(email: string, env: Env, allSlugs: string[]): string[] {
-  if (email === SHARED_REVIEWER) return allSlugs; // The shared password opens every campaign.
   let map: Record<string, string[]> = {};
   try {
     map = JSON.parse(env.REVIEWERS || "{}") as Record<string, string[]>;
@@ -146,6 +189,33 @@ export function reviewerCampaigns(email: string, env: Env, allSlugs: string[]): 
     return [];
   }
   const has = (list: unknown) => Array.isArray(list) && list.some((item) => typeof item === "string" && item.toLowerCase() === email);
-  if (has(map["*"])) return allSlugs;
+  if (has(map["*"]) || has(map.admin)) return allSlugs;
   return allSlugs.filter((slug) => has(map[slug]));
+}
+
+function isNamedAdmin(email: string, env: Env): boolean {
+  try {
+    const list = (JSON.parse(env.REVIEWERS || "{}") as Record<string, unknown>).admin;
+    return Array.isArray(list) && list.some((item) => typeof item === "string" && item.toLowerCase() === email);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Works out who is asking and which campaigns they may open. `campaigns` lists every
+ * campaign with the mark of its current review password.
+ */
+export async function resolveReviewer(request: Request, env: Env, campaigns: { slug: string; mark: string }[]): Promise<Reviewer | null> {
+  const all = campaigns.map((campaign) => campaign.slug);
+  const scope = await cookieScope(request, env);
+  if (scope?.kind === "admin") return { role: "admin", email: "", slugs: all };
+  if (scope?.kind === "all") return { role: "reviewer", email: "", slugs: all };
+  if (scope?.kind === "campaigns") {
+    const slugs = campaigns.filter((campaign) => campaign.mark && scope.grants.some((grant) => grant.slug === campaign.slug && safeEqual(grant.mark, campaign.mark))).map((campaign) => campaign.slug);
+    return slugs.length ? { role: "reviewer", email: "", slugs } : null;
+  }
+  const email = await reviewerEmail(request, env);
+  if (!email) return null;
+  return { role: isNamedAdmin(email, env) ? "admin" : "reviewer", email, slugs: reviewerCampaigns(email, env, all) };
 }

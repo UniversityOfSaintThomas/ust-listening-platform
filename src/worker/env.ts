@@ -15,6 +15,8 @@ export interface Env {
   ACCESS_AUD?: string;
   REVIEWERS?: string;
   DEV_REVIEWER_EMAIL?: string;
-  /** Shared password for the reviewer dashboard. */
+  /** Password that creates and edits campaigns and opens every campaign's results. */
+  ADMIN_PASSWORD?: string;
+  /** Shared password that opens every campaign's results. */
   DASHBOARD_PASSWORD?: string;
 }
