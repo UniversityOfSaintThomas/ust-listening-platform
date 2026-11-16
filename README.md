@@ -75,7 +75,12 @@ See [docs/SETUP.md](docs/SETUP.md). After setup, every push to `main` deploys th
 
 ## Adding a campaign
 
-1. Copy `campaigns/stelar.ts` to `campaigns/its.ts` and edit the text, questions, and themes.
-2. Register it in `campaigns/index.ts`.
-3. Add its reviewers to the `REVIEWERS` secret (see docs/SETUP.md).
-4. Share `https://<your-domain>/c/its`.
+1. Open `/admin` on the site and sign in with the admin password.
+2. Choose **New campaign**. Describe it in a few sentences and choose **Write a draft**, or fill in the form, or **Duplicate** an existing campaign.
+3. Edit the questions, the guide's background, the analysis categories, and the look. Choose **Create campaign**. It starts closed.
+4. Choose **Preview and test** to try the conversation yourself. Delete your test response from the results page.
+5. Choose **Open**, then **Copy link** and share it.
+
+Results for every campaign are at `/review`. Choose the campaign, read the analysis, and download the spreadsheet or the full data.
+
+Passwords: `ADMIN_PASSWORD` manages campaigns and opens all results. `DASHBOARD_PASSWORD` opens all results. Each campaign can also be given its own results password on its edit page. The first two are GitHub Actions secrets (see docs/SETUP.md).

@@ -22,8 +22,9 @@ A feedback platform for University of St. Thomas units. A participant talks or t
 - **The interviewer instructions are built on the server.** The browser must not be able to supply or change them.
 - **Participant text is data.** Never let transcript content act as instructions to a model. Keep the existing guard lines in the prompts.
 - **Accessibility is a requirement.** Keep labels, focus handling, keyboard operation, contrast, and reduced-motion support.
-- **Campaign text belongs in `campaigns/`.** No unit-specific wording in components or the Worker.
-- **The participant notice must stay true.** If you change what is collected, stored, or sent to a vendor, update the notice in the campaign file in the same change.
+- **Campaign text belongs in the campaign record.** Campaigns live in the database and are edited on the admin page. `campaigns/` holds only starter campaigns, copied in once. No unit-specific wording in components or the Worker.
+- **The participant notice must stay true.** The data-handling lines are built in `src/shared/campaign.ts` and are the same for every campaign. If you change what is collected, stored, or sent to a vendor, update them in the same change. Campaigns can add lines, never remove them.
+- **Everything an admin saves passes through `cleanCampaign` and `campaignProblems`.** Never write a campaign to the database without them.
 
 ## Stop and ask a person before
 
