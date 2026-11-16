@@ -33,3 +33,28 @@ Free-form themes cannot be counted across responses. Each campaign defines its t
 ## 8. Built with an AI coding assistant
 **Date:** 2026-11-11. **Status:** noted.
 The system was written with Claude under the owner's direction, in conversation. This specification, the tests, and this record were written afterward to bring the project in line with the university's spec-driven guidance. Future changes should start from `docs/SPEC.md`.
+
+## 9. Campaigns live in the database and are edited on an admin page
+**Date:** 2026-11-16. **Status:** accepted. Replaces "launch a campaign by editing one file".
+The owner wants to start new listening campaigns (end of year check-ins, VR/AR interest, other ITS units) without a code change. Campaigns moved from `campaigns/*.ts` to a `campaigns` table holding each one as JSON. `campaigns/stelar.ts` remains as a starter that is copied in once and never overwrites. A campaign's web address is fixed at creation so links and stored responses stay attached. A campaign with responses cannot be deleted, only closed.
+
+## 10. The data-handling notice is fixed, campaign text is free
+**Date:** 2026-11-16. **Status:** accepted.
+Once anyone with the admin password can write campaign text, a campaign could promise something the system does not do. The six notice lines that describe collection, storage, the AI vendor, and de-identification, and the AI disclosure checkbox, are generated in code and identical for every campaign. A campaign supplies its purpose, who reads the results, and optional extra lines.
+
+## 11. Analysis categories are set per campaign
+**Date:** 2026-11-16. **Status:** accepted. Extends decision 7.
+Strengths, friction, and requests fit service feedback but not a campaign about plans or interest. Each campaign defines two to four categories and a theme list. Coded points carry a category key. Results saved in the earlier three-list shape are read through `normalizeAnalysis` and `normalizeSynthesis`, so no stored data was rewritten. After categories change, a reviewer can code all responses again.
+
+## 12. Three levels of password access
+**Date:** 2026-11-16. **Status:** accepted, same weakness as decision 5.
+An admin password creates and edits campaigns and opens all results. The shared review password opens all results. A campaign can have its own password that opens only its results, stored as a keyed hash. One sign-in box accepts any of them. Each session is tied to the password that opened it, so changing a password ends those sessions. Named sign-in through Cloudflare Access still works, and an "admin" list in `REVIEWERS` names people who can manage campaigns.
+
+## 13. AI drafts campaigns, a person publishes them
+**Date:** 2026-11-16. **Status:** accepted.
+The new-campaign form can draft its fields from a short description. The draft only fills the form. Nothing is saved until the admin reads it and presses Create, and new campaigns start closed with a private preview link for testing the guide before the link is shared.
+
+## 14. Colors are limited to combinations that meet contrast rules
+**Date:** 2026-11-16. **Status:** accepted.
+A campaign can set its main, button, and highlight colors and its headline size. The server refuses colors that fall below WCAG AA contrast for the text placed on them.
+

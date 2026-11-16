@@ -52,7 +52,7 @@ Not yet in place: alerts. Add a Cloudflare notification for Worker error rate, a
 
 ## Rotating keys and the password
 
-Replace the value under GitHub, Settings, Secrets and variables, Actions. Then run the Deploy workflow by hand. Changing `DASHBOARD_PASSWORD` signs every reviewer out.
+Replace the value under GitHub, Settings, Secrets and variables, Actions. Then run the Deploy workflow by hand. Changing `DASHBOARD_PASSWORD` signs every reviewer out. Changing `ADMIN_PASSWORD` signs admins out. A campaign's own results password is changed on its edit page at `/admin`.
 
 ## Closing a campaign
 

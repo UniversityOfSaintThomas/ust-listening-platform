@@ -4,7 +4,7 @@ What this system must do, and how to tell that it does. Change this file before 
 
 ## Purpose
 
-Collect candid feedback about a St. Thomas unit's services through a short conversation with an AI guide, and give that unit's leadership themes and de-identified transcripts to act on. First campaign: STELAR.
+Run listening campaigns for St. Thomas units and projects. Each campaign is a short conversation with an AI guide on one topic, with its own link, questions, and results. The people running it get themes and de-identified transcripts to act on. First campaign: STELAR service feedback.
 
 ## Users
 
@@ -12,7 +12,8 @@ Collect candid feedback about a St. Thomas unit's services through a short conve
 |---|---|
 | Participant (faculty, staff, student) | To give feedback in five to eight minutes, by voice or text, without signing in, knowing what happens to it |
 | Reviewer (unit leadership) | To see recurring strengths, friction, and requests, read the responses behind them, and export the data |
-| Owner (the unit running a campaign) | To launch a campaign by editing one file, and to operate the site without a command line |
+| Reviewer for one campaign (project lead) | To see only their campaign's results |
+| Admin (the owner) | To create, edit, preview, open, close, and duplicate campaigns from a web page, with no code change |
 
 ## Requirements
 
@@ -47,16 +48,29 @@ Each requirement lists how it is verified. "Test" names an automated test in `te
 | S1 | Starting a conversation requires a passed bot check, and is limited per network and per campaign per day. | Manual; code review |
 | S2 | A submission requires a signed, unexpired, single-use token bound to its campaign. | Test: `security.test.ts` |
 | S3 | The AI service key never reaches the browser. | Code review: `startSession` |
-| S4 | The review page requires the shared password. Wrong attempts are limited. A forged or stale sign-in is rejected. Changing the password signs everyone out. | Test: `security.test.ts` |
+| S6 | Only the admin password (or a named admin) can create or change campaigns. A campaign password opens only that campaign's results, and stops working when it is changed. | Test: `security.test.ts` |
+| S4 | The review page requires a password. Wrong attempts are limited. A forged or stale sign-in is rejected. Changing the password signs everyone out. | Test: `security.test.ts` |
 | S5 | Exported spreadsheets cannot carry formulas. Malformed transcript input is dropped. | Test: `format.test.ts` |
 
 ### Review
 
 | ID | Requirement | Verified by |
 |---|---|---|
-| R1 | Each response is coded into the campaign's fixed themes with a summary and supporting quotes. | Manual |
-| R2 | Reviewers can generate a synthesis across responses, export CSV, and delete a response. | Manual |
+| R1 | Each response is coded into the campaign's own categories and themes with a summary and supporting quotes. Results coded under an earlier format still display. | Test: `campaigns.test.ts`; Manual |
+| R2 | Reviewers can choose a campaign, generate a synthesis, download a spreadsheet (CSV) and the full data (JSON), and delete a response. | Test: `campaigns.test.ts` (CSV); Manual |
 | R3 | The review page states how results are produced and warns when there are fewer than five responses. | Manual |
+
+### Campaigns
+
+| ID | Requirement | Verified by |
+|---|---|---|
+| C1 | An admin can create, edit, duplicate, open, and close a campaign. Its questions, guide background, context choices, analysis categories, themes, page text, colors, and headline size are editable. | Manual; Test: `campaigns.test.ts` (cleaning and checks) |
+| C2 | Whatever is saved is cleaned and checked on the server. A campaign missing a purpose, goal, or question, or using a reserved address, is refused. | Test: `campaigns.test.ts` |
+| C3 | No campaign can remove or reword the standard data-handling notice or the AI disclosure. | Test: `campaigns.test.ts` |
+| C4 | Campaign colors must meet WCAG AA contrast or the save is refused. | Test: `campaigns.test.ts` |
+| C5 | A closed campaign accepts conversations only through its private preview link. | Manual; Test: `security.test.ts` (token) |
+| C6 | A campaign with responses cannot be deleted. | Manual |
+| C7 | An AI draft only fills the form. A person must save it. | Manual |
 
 ## Out of scope
 

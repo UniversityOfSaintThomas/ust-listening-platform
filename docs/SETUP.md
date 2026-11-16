@@ -23,7 +23,8 @@ Secrets tab:
 |---|---|
 | `CLOUDFLARE_API_TOKEN` | The token from step 2 |
 | `OPENAI_API_KEY` | The key from step 1 |
-| `DASHBOARD_PASSWORD` | The shared password for the Leadership review page. Use at least 14 characters |
+| `DASHBOARD_PASSWORD` | The shared password that opens every campaign's results. Use at least 14 characters |
+| `ADMIN_PASSWORD` | The password that creates and edits campaigns at `/admin` and opens all results. Use at least 14 characters, different from the one above |
 | `REVIEWERS` | Later, in step 5. For example `{"stelar":["you@stthomas.edu"]}` |
 | `TURNSTILE_SECRET` | Later, in step 6 |
 
@@ -68,6 +69,6 @@ Until this is done the bot check is off. Rate limits still apply.
 - [ ] Try it with the microphone permission denied. It should fall back to typing.
 - [ ] Submit, then confirm the response and its analysis appear in `/review`.
 - [ ] Open `/review` in a private window. It should ask for sign-in.
-- [ ] Read the notice text in `campaigns/stelar.ts` and confirm every statement is true for your setup.
+- [ ] Read the notice on the participant page (the standard lines are in `src/shared/campaign.ts`) and confirm every statement is true for your setup.
 - [ ] Confirm the OpenAI spending limit is set.
 - [ ] Take down the old pilot site and retire its password.

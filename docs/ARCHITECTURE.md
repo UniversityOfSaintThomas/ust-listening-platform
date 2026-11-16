@@ -25,7 +25,8 @@ flowchart LR
 | De-identification and analysis | `src/worker/analysis.ts` | Redaction before storage, theme coding, synthesis |
 | Access and abuse controls | `src/worker/security.ts` | Tokens, password session, bot check, IP hashing |
 | Input and export helpers | `src/worker/format.ts` | Transcript cleaning, CSV cells |
-| Campaigns | `campaigns/` | All unit-specific text and settings |
+| Campaigns | `campaigns` table, `src/worker/store.ts`, `src/shared/campaign.ts` | All unit-specific text and settings, edited at `/admin`. `campaigns/` holds starter campaigns copied in once |
+| Campaign setup | `src/app/Admin.tsx` | Create, edit, duplicate, preview, open, and close campaigns |
 | Schema | `migrations/` | Applied automatically on deploy |
 | Pipeline | `.github/workflows/` | Checks, production deploy, staging deploy |
 
@@ -71,4 +72,4 @@ flowchart LR
 
 Held as GitHub Actions secrets and copied to Cloudflare by the pipeline. None are in the repository.
 
-`CLOUDFLARE_API_TOKEN`, `OPENAI_API_KEY`, `TURNSTILE_SECRET`, `DASHBOARD_PASSWORD`. `SESSION_SECRET` is generated once per environment by the pipeline and never leaves Cloudflare.
+`CLOUDFLARE_API_TOKEN`, `OPENAI_API_KEY`, `TURNSTILE_SECRET`, `DASHBOARD_PASSWORD`, `ADMIN_PASSWORD`. `SESSION_SECRET` is generated once per environment by the pipeline and never leaves Cloudflare.
