@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { Mode, PublicCampaign, Turn } from "../shared/types";
+import { applyDesign } from "./design";
 import { GuideConnection, type GuideStatus } from "./realtime";
 
 type Stage = "loading" | "intro" | "context" | "conversation" | "review" | "thanks" | "unavailable";
@@ -54,6 +55,7 @@ function Acronym({ name }: { name: string }) {
 }
 
 export default function Participant({ slug }: { slug: string }) {
+  const previewToken = new URLSearchParams(window.location.search).get("preview") || "";
   const [campaign, setCampaign] = useState<PublicCampaign | null>(null);
   const [stage, setStage] = useState<Stage>("loading");
   const [error, setError] = useState("");
@@ -81,17 +83,18 @@ export default function Participant({ slug }: { slug: string }) {
   const firstRender = useRef(true);
 
   useEffect(() => {
-    fetch(`/api/campaigns/${encodeURIComponent(slug)}`)
+    fetch(`/api/campaigns/${encodeURIComponent(slug)}${previewToken ? `?preview=${encodeURIComponent(previewToken)}` : ""}`)
       .then(async (response) => {
         if (!response.ok) throw new Error();
         const data = (await response.json()) as PublicCampaign;
         setCampaign(data);
-        document.title = `${data.unit} feedback | University of St. Thomas`;
+        document.title = `${data.title} | University of St. Thomas`;
+        applyDesign(data.design);
         setStage(data.status === "open" ? "intro" : "unavailable");
       })
       .catch(() => setStage("unavailable"));
     return () => connection.current?.stop();
-  }, [slug]);
+  }, [slug, previewToken]);
 
   // Move keyboard and screen reader focus to the new heading on every step after the first.
   useEffect(() => {
@@ -137,7 +140,7 @@ export default function Participant({ slug }: { slug: string }) {
 
   if (stage === "loading") return <main><p className="quiet page-note" role="status">Loading…</p></main>;
   if (stage === "unavailable" || !campaign) {
-    return <main><section className="intro-panel thanks"><div><h1>This feedback page is not available.</h1><p>It may be closed, or the link may be incorrect.</p></div></section></main>;
+    return <main><section className="intro-panel thanks"><div><h1>This page is not available.</h1><p>It may be closed, or the link may be incorrect.</p></div></section></main>;
   }
 
   function goToReview() {
@@ -153,7 +156,7 @@ export default function Participant({ slug }: { slug: string }) {
     setStarting(true);
     setError("");
     try {
-      const session = await post<{ clientSecret: string; submitToken: string }>("/api/sessions", { slug: campaign.slug, mode, context, turnstileToken, consent: consented });
+      const session = await post<{ clientSecret: string; submitToken: string }>("/api/sessions", { slug: campaign.slug, mode, context, turnstileToken, consent: consented, preview: previewToken });
       submitToken.current = session.submitToken;
       const guide = new GuideConnection({ onStatus: setStatus, onTurns: setTurns, onFinish: goToReview, onError: setError });
       connection.current = guide;
@@ -215,7 +218,7 @@ export default function Participant({ slug }: { slug: string }) {
 
   const path: { label: string; state: "done" | "active" | "" }[] = [
     { label: "Notice and consent", state: "done" },
-    { label: "Experience context", state: stage === "context" ? "active" : "done" },
+    { label: "Before you start", state: stage === "context" ? "active" : "done" },
     { label: "Conversation", state: stage === "conversation" ? "active" : stage === "review" ? "done" : "" },
     { label: "Review", state: stage === "review" ? "active" : "" },
   ];
@@ -224,28 +227,29 @@ export default function Participant({ slug }: { slug: string }) {
     <main>
       <header className="masthead">
         <div className="wordmark">ST. THOMAS <span>{unitUpper}</span></div>
-        <span className="masthead-detail">INTERNAL LISTENING PROJECT</span>
+        <span className="masthead-detail">{campaign.mastheadDetail}</span>
       </header>
 
       {
         <section className="hero">
           <div className="hero-copy">
-            <p className="eyebrow"><Acronym name={campaign.unitFullName} /></p>
+            {campaign.unitFullName && <p className="eyebrow"><Acronym name={campaign.unitFullName} /></p>}
             <h1>{campaign.headline}</h1>
             <p>{campaign.invitation}</p>
             <div className="hero-line" />
           </div>
-          <div className="hero-mark" aria-hidden="true"><span>LISTEN</span><b>→</b></div>
+          {campaign.heroWord && <div className="hero-mark" aria-hidden="true"><span>{campaign.heroWord}</span><b>→</b></div>}
         </section>
       }
 
+      {campaign.preview && <p className="notice" role="status">Preview. This campaign is closed, and only people with this link can open it. Anything you submit here is saved with the real responses, so delete test responses from the results page.</p>}
       {error && <p className="notice" role="alert">{error}</p>}
 
       {stage === "intro" && (
         <section className="intro-panel">
           <div>
             <p className="section-label">A SHORT CONVERSATION</p>
-            <h2 ref={heading} tabIndex={-1}>Your perspective matters here.</h2>
+            <h2 ref={heading} tabIndex={-1}>{campaign.introHeading}</h2>
             <p>{campaign.purpose}</p>
             <ul className="notice-list quiet">{campaign.notice.map((line) => <li key={line}>{line}</li>)}</ul>
             <p className="quiet"><strong>Who sees your response.</strong> {campaign.whoSeesResponses}</p>
@@ -279,14 +283,23 @@ export default function Participant({ slug }: { slug: string }) {
 
           {stage === "context" && (
             <div className="question-shell">
-              <div className="question-kicker"><span>02</span><p>START WITH CONTEXT</p></div>
-              <h2 ref={heading} tabIndex={-1}>{campaign.contextPrompt}</h2>
-              <p className="quiet">Choose any that apply. This helps us understand your feedback in context.</p>
-              <div className="chip-grid">
-                {campaign.contextOptions.map((option) => (
-                  <button key={option} type="button" className={context.includes(option) ? "chip selected" : "chip"} aria-pressed={context.includes(option)} onClick={() => toggle(option)}>{option}</button>
-                ))}
-              </div>
+              <div className="question-kicker"><span>02</span><p>{campaign.contextOptions.length ? "START WITH CONTEXT" : "BEFORE YOU START"}</p></div>
+              {campaign.contextOptions.length > 0 ? (
+                <>
+                  <h2 ref={heading} tabIndex={-1}>{campaign.contextPrompt}</h2>
+                  <p className="quiet">Choose any that apply. This helps us understand your response in context.</p>
+                  <div className="chip-grid">
+                    {campaign.contextOptions.map((option) => (
+                      <button key={option} type="button" className={context.includes(option) ? "chip selected" : "chip"} aria-pressed={context.includes(option)} onClick={() => toggle(option)}>{option}</button>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h2 ref={heading} tabIndex={-1}>Ready when you are.</h2>
+                  <p className="quiet">The guide will ask {campaign.questionCount === 1 ? "one question" : `${campaign.questionCount} questions`}. {mode === "voice" ? "Your browser will ask to use the microphone." : "You will type your responses."} You can stop at any time.</p>
+                </>
+              )}
               <div ref={turnstileBox} />
               <button className="primary" disabled={starting || needsCheck} onClick={() => void begin()}>{starting ? "Starting…" : "Start the conversation"}</button>
             </div>
@@ -373,7 +386,7 @@ export default function Participant({ slug }: { slug: string }) {
 
               <div className="response-actions">
                 <button className="quiet-button" onClick={() => { setTurns([]); setError(""); setDiscarded(true); setStage("thanks"); }}>Discard without submitting</button>
-                <button className="primary" disabled={submitting} onClick={() => void submit()}>{submitting ? "Submitting…" : "Submit feedback"}</button>
+                <button className="primary" disabled={submitting} onClick={() => void submit()}>{submitting ? "Submitting…" : "Submit response"}</button>
               </div>
             </div>
           )}
@@ -385,13 +398,13 @@ export default function Participant({ slug }: { slug: string }) {
           <div>
             <p className="section-label">{discarded ? "DISCARDED" : "SUBMITTED"}</p>
             <h2 ref={heading} tabIndex={-1}>{discarded ? "Nothing was saved." : "Thank you for contributing."}</h2>
-            <p>{discarded ? "Your conversation was discarded. You can close this page." : `Your feedback has been recorded for ${campaign.unit}'s service-improvement work. You can close this page.`}</p>
+            <p>{discarded ? "Your conversation was discarded. You can close this page." : campaign.thanksMessage || "Your response has been recorded. You can close this page."}</p>
           </div>
         </section>
       )}
 
       <footer>
-        <span><Acronym name={campaign.unitFullName} /></span>
+        <span>{campaign.unitFullName ? <Acronym name={campaign.unitFullName} /> : campaign.unit}</span>
         <span>University of St. Thomas</span>
         <a className="leadership-link footer-link" href="/review">Leadership review</a>
       </footer>
