@@ -1,24 +1,22 @@
+import { DEFAULT_CATEGORIES, DEFAULT_DESIGN } from "../src/shared/campaign";
 import type { Campaign } from "../src/shared/types";
 
+/** The first campaign. Copied into the database the first time the site runs, then edited from the admin page. */
 export const stelar: Campaign = {
   slug: "stelar",
   status: "open",
+  title: "STELAR service feedback",
   unit: "STELAR",
   unitSpoken: "stellar",
   unitFullName: "Strategic Transformation in Education, Learning, And Research",
+  mastheadDetail: "INTERNAL LISTENING PROJECT",
+  heroWord: "LISTEN",
   headline: "What could feel more possible?",
   invitation: "Share a perspective. Help STELAR make the next learning experience more human, more useful, and more connected. It takes about five to eight minutes.",
+  introHeading: "Your perspective matters here.",
   purpose: "This conversation is designed to improve the services and supports that STELAR provides. It is not an evaluation of any individual.",
-  consentLabel: "I understand that I will be talking with an AI guide, and that AI tools will be used to analyze responses and report findings.",
-  notice: [
-    "Taking part is voluntary. You can skip any question, stop at any time, or discard everything at the end. Nothing is saved until you review the transcript and choose to submit.",
-    "Your response is collected anonymously. There is no sign-in, and we do not ask for or store your name, email, or IP address.",
-    "You will talk with an AI guide, not a person. Your audio is processed by OpenAI to run the conversation and is not stored by this site. OpenAI does not use it to train its models and may keep safety logs for up to 30 days.",
-    "Before a transcript is saved, an automated step replaces names, contact details, and similar identifying details with placeholders such as [name]. It can miss things, so please describe services and processes instead of naming people, and leave out details that would identify you.",
-    "AI tools analyze the saved transcripts and draft the summaries that STELAR leadership reads. People review those summaries before acting on them.",
-    "This is not a channel for urgent problems or formal complaints. Those should go to the IT help desk, your supervisor, or Human Resources.",
-  ],
-  whoSeesResponses: "STELAR leadership reads the themes, summaries, and de-identified transcripts. Transcripts are deleted after 12 months.",
+  readers: "STELAR leadership",
+  extraNotice: [],
   contextPrompt: "Which STELAR services have you used in the past year?",
   contextOptions: [
     "Training or workshops",
@@ -33,6 +31,8 @@ export const stelar: Campaign = {
     "None yet",
   ],
   roles: ["Faculty", "Staff", "Student", "Other", "Prefer not to say"],
+  goal: "Learn what STELAR is doing well, where people run into friction or unmet needs, and which one change would help them most, so that STELAR can improve its services and supports.",
+  background: "STELAR is the academic technology and learning innovation unit at the University of St. Thomas. It supports faculty and staff with training, course and program design, Canvas and other learning tools, AI support, accessibility, digital badges, media production, and emerging technology.",
   questions: [
     {
       id: "working",
@@ -52,6 +52,7 @@ export const stelar: Campaign = {
       listenFor: "One change, and why it matters more than the alternatives.",
     },
   ],
+  categories: DEFAULT_CATEGORIES,
   themes: [
     "Training and workshops",
     "Course and program design",
@@ -78,7 +79,9 @@ export const stelar: Campaign = {
     "Zoom",
     "Panopto",
   ],
+  thanksMessage: "Your feedback has been recorded for STELAR's service-improvement work. You can close this page.",
   maxMinutes: 12,
   retentionDays: 365,
   dailySessionCap: 300,
+  design: DEFAULT_DESIGN,
 };
